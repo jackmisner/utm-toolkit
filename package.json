@@ -47,7 +47,10 @@
     "lint:fix": "oxlint --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\"",
-    "prepublishOnly": "npm run clean && npm run build && npm run test"
+    "prepublishOnly": "npm run clean && npm run build && npm run test",
+    "release:patch": "node scripts/release.js patch",
+    "release:minor": "node scripts/release.js minor",
+    "release:major": "node scripts/release.js major"
   },
   "peerDependencies": {
     "react": ">=16.8.0"

@@ -1,5 +1,7 @@
 # @jackmisner/utm-toolkit
 
+[![CI](https://github.com/jackmisner/utm-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/jackmisner/utm-toolkit/actions/workflows/ci.yml)
+
 A comprehensive TypeScript library for capturing, storing, and appending UTM tracking parameters. Framework-agnostic core with optional React integration.
 
 ## Features

@@ -80,12 +80,15 @@ function main() {
   console.log('📥 Pulling latest from main...')
   run(`git pull ${remote} main`)
 
-  // Stage and commit any uncommitted changes
+  // Check for uncommitted changes
   const status = runCapture('git status --porcelain')
   if (status) {
-    console.log('\n📝 Staging and committing uncommitted changes...')
-    run('git add .')
-    run(`git commit -m "chore: prepare for v${newVersion} release"`)
+    console.error(`❌ Working directory has uncommitted changes.
+
+Please review and commit your changes before releasing v${newVersion}:
+Then run the release command again.
+`)
+    process.exit(1)
   }
 
   // Create release branch

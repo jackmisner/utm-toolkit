@@ -203,11 +203,11 @@ export function validateConfig(config: unknown): string[] {
     }
   }
 
-  if (c.defaultParams !== undefined && (typeof c.defaultParams !== 'object' || c.defaultParams === null)) {
+  if (c.defaultParams !== undefined && (typeof c.defaultParams !== 'object' || c.defaultParams === null || Array.isArray(c.defaultParams))) {
     errors.push('defaultParams must be an object');
   }
 
-  if (c.shareContextParams !== undefined && (typeof c.shareContextParams !== 'object' || c.shareContextParams === null)) {
+  if (c.shareContextParams !== undefined && (typeof c.shareContextParams !== 'object' || c.shareContextParams === null || Array.isArray(c.shareContextParams))) {
     errors.push('shareContextParams must be an object');
   }
 

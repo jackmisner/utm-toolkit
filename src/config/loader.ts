@@ -24,7 +24,7 @@ function mergeShareContextParams(
     if (value !== undefined) {
       // Merge platform-specific params with base
       result[key] = {
-        ...(base[key] || {}),
+        ...base[key],
         ...value,
       }
     }

@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  format:
+    uses: ./.github/workflows/format.yml
+    secrets: inherit
+
+  test-node18:
+    needs: format
+    uses: ./.github/workflows/ci-node18.yml
+
+  test-node20:
+    needs: format
+    uses: ./.github/workflows/ci-node20.yml
+
+  test-node22:
+    needs: format
+    uses: ./.github/workflows/ci-node22.yml
+    secrets: inherit

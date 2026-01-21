@@ -1,5 +1,10 @@
 # @jackmisner/utm-toolkit
 
+[![Format](https://github.com/jackmisner/utm-toolkit/actions/workflows/format.yml/badge.svg)](https://github.com/jackmisner/utm-toolkit/actions/workflows/format.yml)
+[![CI - Node 18](https://github.com/jackmisner/utm-toolkit/actions/workflows/ci-node18.yml/badge.svg)](https://github.com/jackmisner/utm-toolkit/actions/workflows/ci-node18.yml)
+[![CI - Node 20](https://github.com/jackmisner/utm-toolkit/actions/workflows/ci-node20.yml/badge.svg)](https://github.com/jackmisner/utm-toolkit/actions/workflows/ci-node20.yml)
+[![CI - Node 22](https://github.com/jackmisner/utm-toolkit/actions/workflows/ci-node22.yml/badge.svg)](https://github.com/jackmisner/utm-toolkit/actions/workflows/ci-node22.yml)
+
 A comprehensive TypeScript library for capturing, storing, and appending UTM tracking parameters. Framework-agnostic core with optional React integration.
 
 ## Features

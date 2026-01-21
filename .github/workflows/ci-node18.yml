@@ -1,0 +1,39 @@
+name: CI - Node 18
+
+on:
+  workflow_run:
+    workflows: ["Format"]
+    types:
+      - completed
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type checking
+        run: npm run lint
+
+      - name: Run tests
+        env:
+          CI: true
+          NODE_ENV: test
+        run: npm test
+
+      - name: Build package
+        run: npm run build

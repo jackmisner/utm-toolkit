@@ -11,7 +11,7 @@ export {
   captureFromCurrentUrl,
   captureWithReferrer,
   type CaptureOptions,
-} from './capture';
+} from './capture'
 
 // Storage utilities
 export {
@@ -23,14 +23,10 @@ export {
   getRawStoredValue,
   DEFAULT_STORAGE_KEY,
   type StorageOptions,
-} from './storage';
+} from './storage'
 
 // Appender utilities
-export {
-  appendUtmParameters,
-  removeUtmParameters,
-  extractUtmParameters,
-} from './appender';
+export { appendUtmParameters, removeUtmParameters, extractUtmParameters } from './appender'
 
 // Key conversion utilities
 export {
@@ -50,7 +46,7 @@ export {
   CAMEL_TO_SNAKE,
   STANDARD_SNAKE_KEYS,
   STANDARD_CAMEL_KEYS,
-} from './keys';
+} from './keys'
 
 // Validator utilities
 export {
@@ -64,4 +60,4 @@ export {
   isProtocolAllowed,
   getErrorMessage,
   ERROR_MESSAGES,
-} from './validator';
+} from './validator'

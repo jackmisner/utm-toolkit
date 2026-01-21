@@ -6,15 +6,15 @@
  * prop drilling.
  */
 
-import React, { createContext, useContext, useMemo } from 'react';
-import type { UtmConfig, UtmProviderProps, UseUtmTrackingReturn } from '../types';
-import { useUtmTracking } from './useUtmTracking';
+import React, { createContext, useContext, useMemo } from 'react'
+import type { UtmConfig, UtmProviderProps, UseUtmTrackingReturn } from '../types'
+import { useUtmTracking } from './useUtmTracking'
 
 /**
  * Context for UTM tracking state
  * @internal
  */
-const UtmContext = createContext<UseUtmTrackingReturn | null>(null);
+const UtmContext = createContext<UseUtmTrackingReturn | null>(null)
 
 /**
  * UTM Provider component
@@ -44,23 +44,22 @@ const UtmContext = createContext<UseUtmTrackingReturn | null>(null);
  */
 export function UtmProvider({ config, children }: UtmProviderProps): React.ReactElement {
   // Use the tracking hook with provided config
-  const utmTracking = useUtmTracking({ config });
+  const utmTracking = useUtmTracking({ config })
 
   // Memoize the context value to prevent unnecessary re-renders
-  const contextValue = useMemo(() => utmTracking, [
-    utmTracking.utmParameters,
-    utmTracking.isEnabled,
-    utmTracking.hasParams,
-    utmTracking.capture,
-    utmTracking.clear,
-    utmTracking.appendToUrl,
-  ]);
+  const contextValue = useMemo(
+    () => utmTracking,
+    [
+      utmTracking.utmParameters,
+      utmTracking.isEnabled,
+      utmTracking.hasParams,
+      utmTracking.capture,
+      utmTracking.clear,
+      utmTracking.appendToUrl,
+    ],
+  )
 
-  return (
-    <UtmContext.Provider value={contextValue}>
-      {children}
-    </UtmContext.Provider>
-  );
+  return <UtmContext.Provider value={contextValue}>{children}</UtmContext.Provider>
 }
 
 /**
@@ -82,16 +81,16 @@ export function UtmProvider({ config, children }: UtmProviderProps): React.React
  * ```
  */
 export function useUtmContext(): UseUtmTrackingReturn {
-  const context = useContext(UtmContext);
+  const context = useContext(UtmContext)
 
   if (context === null) {
     throw new Error(
       'useUtmContext must be used within a UtmProvider. ' +
-      'Wrap your component tree with <UtmProvider> or use useUtmTracking() directly.'
-    );
+        'Wrap your component tree with <UtmProvider> or use useUtmTracking() directly.',
+    )
   }
 
-  return context;
+  return context
 }
 
 /**
@@ -99,7 +98,7 @@ export function useUtmContext(): UseUtmTrackingReturn {
  */
 export interface UtmProviderComponentProps {
   /** Configuration options */
-  config?: Partial<UtmConfig>;
+  config?: Partial<UtmConfig>
   /** Child components */
-  children: React.ReactNode;
+  children: React.ReactNode
 }

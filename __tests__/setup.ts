@@ -1,30 +1,30 @@
-import { beforeEach, vi } from 'vitest';
+import { beforeEach, vi } from 'vitest'
 
 // Mock sessionStorage
 const createStorageMock = () => {
-  let store: Record<string, string> = {};
+  let store: Record<string, string> = {}
   return {
     getItem: vi.fn((key: string) => store[key] ?? null),
     setItem: vi.fn((key: string, value: string) => {
-      store[key] = value;
+      store[key] = value
     }),
     removeItem: vi.fn((key: string) => {
-      delete store[key];
+      delete store[key]
     }),
     clear: vi.fn(() => {
-      store = {};
+      store = {}
     }),
     get length() {
-      return Object.keys(store).length;
+      return Object.keys(store).length
     },
     key: vi.fn((index: number) => Object.keys(store)[index] ?? null),
-  };
-};
+  }
+}
 
 // Reset mocks before each test
 beforeEach(() => {
-  const sessionStorageMock = createStorageMock();
-  vi.stubGlobal('sessionStorage', sessionStorageMock);
+  const sessionStorageMock = createStorageMock()
+  vi.stubGlobal('sessionStorage', sessionStorageMock)
 
   // Reset location mock
   vi.stubGlobal('location', {
@@ -35,5 +35,5 @@ beforeEach(() => {
     protocol: 'https:',
     host: 'example.com',
     hostname: 'example.com',
-  });
-});
+  })
+})

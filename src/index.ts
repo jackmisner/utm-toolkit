@@ -59,7 +59,7 @@ export {
   isProtocolAllowed,
   getErrorMessage,
   ERROR_MESSAGES,
-} from './core';
+} from './core'
 
 // Configuration
 export {
@@ -70,15 +70,10 @@ export {
   mergeConfig,
   loadConfigFromJson,
   validateConfig,
-} from './config';
+} from './config'
 
 // Debug utilities
-export {
-  getDiagnostics,
-  debugUtmState,
-  checkUtmTracking,
-  installDebugHelpers,
-} from './debug';
+export { getDiagnostics, debugUtmState, checkUtmTracking, installDebugHelpers } from './debug'
 
 // Types
 export type {
@@ -99,4 +94,4 @@ export type {
   UseUtmTrackingReturn,
   UtmProviderProps,
   DiagnosticInfo,
-} from './types';
+} from './types'

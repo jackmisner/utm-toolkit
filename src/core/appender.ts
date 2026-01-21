@@ -5,8 +5,8 @@
  * Supports both query string and fragment (hash) parameter placement.
  */
 
-import type { AppendOptions, UtmParameters } from '../types';
-import { toSnakeCaseParams, isSnakeCaseUtmKey, isCamelCaseUtmKey } from './keys';
+import type { AppendOptions, UtmParameters } from '../types'
+import { toSnakeCaseParams, isSnakeCaseUtmKey, isCamelCaseUtmKey } from './keys'
 
 /**
  * Builds a query string with proper handling of empty parameter values
@@ -18,26 +18,26 @@ import { toSnakeCaseParams, isSnakeCaseUtmKey, isCamelCaseUtmKey } from './keys'
  * @returns The formatted query string (without leading ?)
  */
 function buildQueryString(params: URLSearchParams): string {
-  const pairs: string[] = [];
+  const pairs: string[] = []
 
   for (const [key, value] of params.entries()) {
     if (value === '') {
       // Empty values: include key only, no equals sign
-      pairs.push(encodeURIComponent(key));
+      pairs.push(encodeURIComponent(key))
     } else {
       // Standard key-value pairs with proper URL encoding
-      pairs.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+      pairs.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
     }
   }
 
-  return pairs.join('&');
+  return pairs.join('&')
 }
 
 /**
  * Check if a key is a UTM key (in either format)
  */
 function isAnyUtmKey(key: string): boolean {
-  return isSnakeCaseUtmKey(key) || isCamelCaseUtmKey(key);
+  return isSnakeCaseUtmKey(key) || isCamelCaseUtmKey(key)
 }
 
 /**
@@ -45,8 +45,8 @@ function isAnyUtmKey(key: string): boolean {
  */
 function hasValidUtmEntries(params: UtmParameters): boolean {
   return Object.entries(params).some(
-    ([key, value]) => isAnyUtmKey(key) && value !== undefined && value !== ''
-  );
+    ([key, value]) => isAnyUtmKey(key) && value !== undefined && value !== '',
+  )
 }
 
 /**
@@ -98,134 +98,126 @@ function hasValidUtmEntries(params: UtmParameters): boolean {
 export function appendUtmParameters(
   url: string,
   utmParams: UtmParameters,
-  options: AppendOptions = {}
+  options: AppendOptions = {},
 ): string {
-  const { toFragment = false, preserveExisting = false } = options;
+  const { toFragment = false, preserveExisting = false } = options
 
   // Fast-path: nothing to append
   if (!hasValidUtmEntries(utmParams)) {
-    return url;
+    return url
   }
 
   // SSR safety check
   if (typeof URL === 'undefined') {
-    return url;
+    return url
   }
 
   try {
     // Convert all params to snake_case for URL usage
-    const snakeParams = toSnakeCaseParams(utmParams);
+    const snakeParams = toSnakeCaseParams(utmParams)
 
     // Parse the URL
-    const urlObj = new URL(url);
+    const urlObj = new URL(url)
 
     if (toFragment) {
       // === FRAGMENT-BASED PARAMETER ADDITION ===
-      return appendToFragment(urlObj, snakeParams, preserveExisting);
+      return appendToFragment(urlObj, snakeParams, preserveExisting)
     } else {
       // === QUERY-BASED PARAMETER ADDITION (DEFAULT) ===
-      return appendToQuery(urlObj, snakeParams, preserveExisting);
+      return appendToQuery(urlObj, snakeParams, preserveExisting)
     }
   } catch (error) {
     // If URL parsing fails, return the original URL unchanged
     if (typeof console !== 'undefined' && console.warn) {
-      console.warn('Failed to append UTM parameters to URL:', error);
+      console.warn('Failed to append UTM parameters to URL:', error)
     }
-    return url;
+    return url
   }
 }
 
 /**
  * Append UTM parameters to URL query string
  */
-function appendToQuery(
-  urlObj: URL,
-  params: UtmParameters,
-  preserveExisting: boolean
-): string {
+function appendToQuery(urlObj: URL, params: UtmParameters, preserveExisting: boolean): string {
   // When adding to query, handle conflicting parameters in fragment
   if (urlObj.hash) {
-    const originalFragment = urlObj.hash.substring(1);
+    const originalFragment = urlObj.hash.substring(1)
 
     // Only process fragment as parameters if it looks like parameters (contains '=')
     // Regular fragments (like #section) should be left alone
     if (originalFragment.includes('=')) {
-      const fragmentParams = new URLSearchParams(originalFragment);
+      const fragmentParams = new URLSearchParams(originalFragment)
 
       // Remove tracking parameters from fragment (newer location wins)
       for (const key of Object.keys(params)) {
-        fragmentParams.delete(key);
+        fragmentParams.delete(key)
       }
 
       // Update fragment, clearing it if no parameters remain
-      urlObj.hash = fragmentParams.toString() || '';
+      urlObj.hash = fragmentParams.toString() || ''
     }
   }
 
   // Process query parameters
   for (const [key, value] of Object.entries(params)) {
-    if (value === undefined) continue;
+    if (value === undefined) continue
 
     if (preserveExisting && urlObj.searchParams.has(key)) {
       // Skip if preserving existing and param already exists
-      continue;
+      continue
     }
 
     // Remove existing parameter first to avoid duplicates
-    urlObj.searchParams.delete(key);
+    urlObj.searchParams.delete(key)
     // Add the new parameter
-    urlObj.searchParams.set(key, value);
+    urlObj.searchParams.set(key, value)
   }
 
   // Manually rebuild URL to handle empty parameter values correctly
-  const queryString = buildQueryString(urlObj.searchParams);
-  const baseUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
+  const queryString = buildQueryString(urlObj.searchParams)
+  const baseUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`
 
   // Construct final URL with proper fragment handling
-  const hash = urlObj.hash;
+  const hash = urlObj.hash
   const finalUrl =
     baseUrl +
     (queryString ? `?${queryString}` : '') +
-    (hash ? (hash.startsWith('#') ? hash : `#${hash}`) : '');
+    (hash ? (hash.startsWith('#') ? hash : `#${hash}`) : '')
 
-  return finalUrl;
+  return finalUrl
 }
 
 /**
  * Append UTM parameters to URL fragment (hash)
  */
-function appendToFragment(
-  urlObj: URL,
-  params: UtmParameters,
-  preserveExisting: boolean
-): string {
+function appendToFragment(urlObj: URL, params: UtmParameters, preserveExisting: boolean): string {
   // Remove conflicting parameters from query string (newer location wins)
   for (const key of Object.keys(params)) {
-    urlObj.searchParams.delete(key);
+    urlObj.searchParams.delete(key)
   }
 
   // Parse existing fragment as parameters
-  const fragmentParams = new URLSearchParams(urlObj.hash.substring(1));
+  const fragmentParams = new URLSearchParams(urlObj.hash.substring(1))
 
   // Process fragment parameters
   for (const [key, value] of Object.entries(params)) {
-    if (value === undefined) continue;
+    if (value === undefined) continue
 
     if (preserveExisting && fragmentParams.has(key)) {
       // Skip if preserving existing and param already exists
-      continue;
+      continue
     }
 
     // Remove existing parameter first to avoid duplicates
-    fragmentParams.delete(key);
+    fragmentParams.delete(key)
     // Add the new parameter
-    fragmentParams.set(key, value);
+    fragmentParams.set(key, value)
   }
 
   // Build the fragment string
-  urlObj.hash = buildQueryString(fragmentParams);
+  urlObj.hash = buildQueryString(fragmentParams)
 
-  return urlObj.toString();
+  return urlObj.toString()
 }
 
 /**
@@ -253,51 +245,51 @@ function appendToFragment(
  */
 export function removeUtmParameters(url: string, keysToRemove?: string[]): string {
   if (typeof URL === 'undefined') {
-    return url;
+    return url
   }
 
   try {
-    const urlObj = new URL(url);
+    const urlObj = new URL(url)
 
     // Remove from query string
-    const queryKeysToDelete: string[] = [];
+    const queryKeysToDelete: string[] = []
     for (const key of urlObj.searchParams.keys()) {
       if (keysToRemove) {
         if (keysToRemove.includes(key)) {
-          queryKeysToDelete.push(key);
+          queryKeysToDelete.push(key)
         }
       } else if (isSnakeCaseUtmKey(key)) {
-        queryKeysToDelete.push(key);
+        queryKeysToDelete.push(key)
       }
     }
     for (const key of queryKeysToDelete) {
-      urlObj.searchParams.delete(key);
+      urlObj.searchParams.delete(key)
     }
 
     // Remove from fragment if it contains parameters
     if (urlObj.hash && urlObj.hash.includes('=')) {
-      const fragmentParams = new URLSearchParams(urlObj.hash.substring(1));
-      const fragmentKeysToDelete: string[] = [];
+      const fragmentParams = new URLSearchParams(urlObj.hash.substring(1))
+      const fragmentKeysToDelete: string[] = []
 
       for (const key of fragmentParams.keys()) {
         if (keysToRemove) {
           if (keysToRemove.includes(key)) {
-            fragmentKeysToDelete.push(key);
+            fragmentKeysToDelete.push(key)
           }
         } else if (isSnakeCaseUtmKey(key)) {
-          fragmentKeysToDelete.push(key);
+          fragmentKeysToDelete.push(key)
         }
       }
       for (const key of fragmentKeysToDelete) {
-        fragmentParams.delete(key);
+        fragmentParams.delete(key)
       }
 
-      urlObj.hash = fragmentParams.toString();
+      urlObj.hash = fragmentParams.toString()
     }
 
-    return urlObj.toString();
+    return urlObj.toString()
   } catch {
-    return url;
+    return url
   }
 }
 
@@ -309,33 +301,33 @@ export function removeUtmParameters(url: string, keysToRemove?: string[]): strin
  */
 export function extractUtmParameters(url: string): UtmParameters {
   if (typeof URL === 'undefined') {
-    return {};
+    return {}
   }
 
   try {
-    const urlObj = new URL(url);
-    const params: Record<string, string> = {};
+    const urlObj = new URL(url)
+    const params: Record<string, string> = {}
 
     // Extract from query string
     for (const [key, value] of urlObj.searchParams.entries()) {
       if (isSnakeCaseUtmKey(key)) {
-        params[key] = value;
+        params[key] = value
       }
     }
 
     // Extract from fragment if it contains parameters
     if (urlObj.hash && urlObj.hash.includes('=')) {
-      const fragmentParams = new URLSearchParams(urlObj.hash.substring(1));
+      const fragmentParams = new URLSearchParams(urlObj.hash.substring(1))
       for (const [key, value] of fragmentParams.entries()) {
         if (isSnakeCaseUtmKey(key)) {
           // Fragment params override query params (later in URL = higher priority)
-          params[key] = value;
+          params[key] = value
         }
       }
     }
 
-    return params as UtmParameters;
+    return params as UtmParameters
   } catch {
-    return {};
+    return {}
   }
 }

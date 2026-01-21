@@ -7,7 +7,7 @@
  * - URL normalization (add protocol if missing)
  */
 
-import type { ValidationResult, ValidationError } from '../types';
+import type { ValidationResult, ValidationError } from '../types'
 
 /**
  * Error messages for validation errors
@@ -17,17 +17,17 @@ export const ERROR_MESSAGES: Record<ValidationError, string> = {
   invalid_domain: 'URL must have a valid domain with a TLD (e.g., example.com)',
   malformed_url: 'URL is malformed or invalid',
   empty_url: 'URL cannot be empty',
-};
+}
 
 /**
  * Allowed protocols for URL validation
  */
-const ALLOWED_PROTOCOLS = ['http:', 'https:'];
+const ALLOWED_PROTOCOLS = ['http:', 'https:']
 
 /**
  * Default protocol to add when normalizing URLs
  */
-let defaultProtocol = 'https://';
+let defaultProtocol = 'https://'
 
 /**
  * Validate URL protocol
@@ -38,9 +38,9 @@ function validateProtocol(protocol: string): ValidationResult {
       valid: false,
       error: 'invalid_protocol',
       message: ERROR_MESSAGES.invalid_protocol,
-    };
+    }
   }
-  return { valid: true };
+  return { valid: true }
 }
 
 /**
@@ -53,7 +53,7 @@ function validateDomain(hostname: string): ValidationResult {
       valid: false,
       error: 'invalid_domain',
       message: ERROR_MESSAGES.invalid_domain,
-    };
+    }
   }
 
   // TLD requirement - must contain at least one dot
@@ -62,7 +62,7 @@ function validateDomain(hostname: string): ValidationResult {
       valid: false,
       error: 'invalid_domain',
       message: ERROR_MESSAGES.invalid_domain,
-    };
+    }
   }
 
   // Ensure hostname is not just dots
@@ -71,17 +71,17 @@ function validateDomain(hostname: string): ValidationResult {
       valid: false,
       error: 'invalid_domain',
       message: ERROR_MESSAGES.invalid_domain,
-    };
+    }
   }
 
-  return { valid: true };
+  return { valid: true }
 }
 
 /**
  * Check if a URL string has a protocol
  */
 function hasProtocol(url: string): boolean {
-  return url.includes('://');
+  return url.includes('://')
 }
 
 /**
@@ -114,31 +114,31 @@ export function validateUrl(url: string): ValidationResult {
       valid: false,
       error: 'empty_url',
       message: ERROR_MESSAGES.empty_url,
-    };
+    }
   }
 
   try {
-    const urlObj = new URL(url);
+    const urlObj = new URL(url)
 
     // Protocol validation
-    const protocolResult = validateProtocol(urlObj.protocol);
+    const protocolResult = validateProtocol(urlObj.protocol)
     if (!protocolResult.valid) {
-      return protocolResult;
+      return protocolResult
     }
 
     // Domain validation
-    const domainResult = validateDomain(urlObj.hostname);
+    const domainResult = validateDomain(urlObj.hostname)
     if (!domainResult.valid) {
-      return domainResult;
+      return domainResult
     }
 
-    return { valid: true };
+    return { valid: true }
   } catch {
     return {
       valid: false,
       error: 'malformed_url',
       message: ERROR_MESSAGES.malformed_url,
-    };
+    }
   }
 }
 
@@ -165,18 +165,18 @@ export function validateUrl(url: string): ValidationResult {
  */
 export function normalizeUrl(url: string): string {
   if (typeof url !== 'string') {
-    return url;
+    return url
   }
 
-  const trimmedUrl = url.trim();
+  const trimmedUrl = url.trim()
 
   // Check if URL already has a protocol
   if (hasProtocol(trimmedUrl)) {
-    return trimmedUrl;
+    return trimmedUrl
   }
 
   // Add default protocol for URLs without explicit protocol
-  return defaultProtocol + trimmedUrl;
+  return defaultProtocol + trimmedUrl
 }
 
 /**
@@ -187,9 +187,9 @@ export function normalizeUrl(url: string): string {
  */
 export function needsNormalization(url: string): boolean {
   if (typeof url !== 'string') {
-    return false;
+    return false
   }
-  return !hasProtocol(url.trim());
+  return !hasProtocol(url.trim())
 }
 
 /**
@@ -210,13 +210,13 @@ export function needsNormalization(url: string): boolean {
  * ```
  */
 export function validateAndNormalize(url: string): ValidationResult & { normalizedUrl?: string } {
-  const normalizedUrl = normalizeUrl(url);
-  const result = validateUrl(normalizedUrl);
+  const normalizedUrl = normalizeUrl(url)
+  const result = validateUrl(normalizedUrl)
 
   return {
     ...result,
     normalizedUrl,
-  };
+  }
 }
 
 /**
@@ -225,7 +225,7 @@ export function validateAndNormalize(url: string): ValidationResult & { normaliz
  * @returns The default protocol (e.g., 'https://')
  */
 export function getDefaultProtocol(): string {
-  return defaultProtocol;
+  return defaultProtocol
 }
 
 /**
@@ -241,9 +241,9 @@ export function getDefaultProtocol(): string {
  */
 export function setDefaultProtocol(protocol: string): void {
   if (typeof protocol !== 'string' || !protocol.endsWith('://')) {
-    throw new Error('Protocol must be a string ending with "://"');
+    throw new Error('Protocol must be a string ending with "://"')
   }
-  defaultProtocol = protocol;
+  defaultProtocol = protocol
 }
 
 /**
@@ -252,7 +252,7 @@ export function setDefaultProtocol(protocol: string): void {
  * @returns Array of allowed protocols (e.g., ['http:', 'https:'])
  */
 export function getAllowedProtocols(): string[] {
-  return [...ALLOWED_PROTOCOLS];
+  return [...ALLOWED_PROTOCOLS]
 }
 
 /**
@@ -262,7 +262,7 @@ export function getAllowedProtocols(): string[] {
  * @returns True if protocol is allowed
  */
 export function isProtocolAllowed(protocol: string): boolean {
-  return ALLOWED_PROTOCOLS.includes(protocol);
+  return ALLOWED_PROTOCOLS.includes(protocol)
 }
 
 /**
@@ -272,5 +272,5 @@ export function isProtocolAllowed(protocol: string): boolean {
  * @returns Human-readable error message
  */
 export function getErrorMessage(error: ValidationError): string {
-  return ERROR_MESSAGES[error] || 'Unknown validation error';
+  return ERROR_MESSAGES[error] || 'Unknown validation error'
 }

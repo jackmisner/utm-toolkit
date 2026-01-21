@@ -4,7 +4,7 @@
  * Provides sensible defaults for UTM toolkit configuration.
  */
 
-import type { ResolvedUtmConfig } from '../types';
+import type { ResolvedUtmConfig } from '../types'
 
 /**
  * Standard UTM parameters (snake_case format for URLs)
@@ -16,7 +16,7 @@ export const STANDARD_UTM_PARAMETERS = [
   'utm_term',
   'utm_content',
   'utm_id',
-] as const;
+] as const
 
 /**
  * Default configuration with all values set
@@ -49,7 +49,7 @@ export const DEFAULT_CONFIG: ResolvedUtmConfig = {
 
   /** No parameters excluded from shares by default */
   excludeFromShares: [],
-};
+}
 
 /**
  * Get a copy of the default configuration
@@ -62,5 +62,5 @@ export function getDefaultConfig(): ResolvedUtmConfig {
     defaultParams: { ...DEFAULT_CONFIG.defaultParams },
     shareContextParams: { ...DEFAULT_CONFIG.shareContextParams },
     excludeFromShares: [...DEFAULT_CONFIG.excludeFromShares],
-  };
+  }
 }

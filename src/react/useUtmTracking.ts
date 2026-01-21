@@ -5,30 +5,30 @@
  * Provides a simple API for UTM tracking throughout React applications.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type {
   UtmConfig,
   UtmParameters,
   ResolvedUtmConfig,
   SharePlatform,
   UseUtmTrackingReturn,
-} from '../types';
-import { captureUtmParameters, hasUtmParameters as checkHasParams } from '../core/capture';
+} from '../types'
+import { captureUtmParameters, hasUtmParameters as checkHasParams } from '../core/capture'
 import {
   storeUtmParameters,
   getStoredUtmParameters,
   clearStoredUtmParameters,
-} from '../core/storage';
-import { appendUtmParameters } from '../core/appender';
-import { convertParams, isSnakeCaseUtmKey } from '../core/keys';
-import { createConfig } from '../config/loader';
+} from '../core/storage'
+import { appendUtmParameters } from '../core/appender'
+import { convertParams, isSnakeCaseUtmKey } from '../core/keys'
+import { createConfig } from '../config/loader'
 
 /**
  * Options for the useUtmTracking hook
  */
 export interface UseUtmTrackingOptions {
   /** Configuration options (will be merged with defaults) */
-  config?: Partial<UtmConfig>;
+  config?: Partial<UtmConfig>
 }
 
 /**
@@ -77,20 +77,20 @@ export interface UseUtmTrackingOptions {
  */
 export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrackingReturn {
   // Create resolved config (merges with defaults)
-  const resolvedConfig = useRef<ResolvedUtmConfig>(createConfig(options.config));
+  const resolvedConfig = useRef<ResolvedUtmConfig>(createConfig(options.config))
 
   // Track if we've initialized
-  const hasInitialized = useRef(false);
+  const hasInitialized = useRef(false)
 
   // Get config values for easier access
-  const config = resolvedConfig.current;
-  const isEnabled = config.enabled;
+  const config = resolvedConfig.current
+  const isEnabled = config.enabled
 
   // State to store current UTM parameters
   const [utmParameters, setUtmParameters] = useState<UtmParameters | null>(() => {
     // SSR safety check
     if (typeof window === 'undefined') {
-      return null;
+      return null
     }
 
     // Initialize from storage if enabled
@@ -98,56 +98,56 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
       const stored = getStoredUtmParameters({
         storageKey: config.storageKey,
         keyFormat: config.keyFormat,
-      });
-      return stored;
+      })
+      return stored
     }
-    return null;
-  });
+    return null
+  })
 
   /**
    * Capture UTM parameters from current URL
    */
   const capture = useCallback(() => {
     if (!isEnabled) {
-      return;
+      return
     }
 
     // SSR safety check
     if (typeof window === 'undefined') {
-      return;
+      return
     }
 
     // Capture UTM parameters from current URL
     const params = captureUtmParameters(window.location.href, {
       keyFormat: config.keyFormat,
       allowedParameters: config.allowedParameters,
-    });
+    })
 
     // Only store if we found some parameters
     if (checkHasParams(params)) {
       storeUtmParameters(params, {
         storageKey: config.storageKey,
         keyFormat: config.keyFormat,
-      });
-      setUtmParameters(params);
+      })
+      setUtmParameters(params)
     } else if (checkHasParams(config.defaultParams)) {
       // Use default parameters if no UTMs found and defaults are configured
-      const defaultParams = convertParams(config.defaultParams, config.keyFormat);
+      const defaultParams = convertParams(config.defaultParams, config.keyFormat)
       storeUtmParameters(defaultParams, {
         storageKey: config.storageKey,
         keyFormat: config.keyFormat,
-      });
-      setUtmParameters(defaultParams);
+      })
+      setUtmParameters(defaultParams)
     }
-  }, [isEnabled, config]);
+  }, [isEnabled, config])
 
   /**
    * Clear stored UTM parameters
    */
   const clear = useCallback(() => {
-    clearStoredUtmParameters(config.storageKey);
-    setUtmParameters(null);
-  }, [config.storageKey]);
+    clearStoredUtmParameters(config.storageKey)
+    setUtmParameters(null)
+  }, [config.storageKey])
 
   /**
    * Append UTM parameters to a URL
@@ -156,69 +156,74 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
     (url: string, platform?: SharePlatform): string => {
       // If tracking disabled or not configured to append, return URL unchanged
       if (!isEnabled || !config.appendToShares) {
-        return url;
+        return url
       }
 
       // Build merged parameters: captured < default share < platform-specific
-      let mergedParams: UtmParameters = {};
+      let mergedParams: UtmParameters = {}
 
       // Start with captured UTMs (if any)
       if (utmParameters && checkHasParams(utmParameters)) {
-        mergedParams = { ...utmParameters };
+        mergedParams = { ...utmParameters }
       }
 
       // Merge share context parameters if configured
       if (config.shareContextParams) {
         // Apply default share context params first
         if (config.shareContextParams.default) {
-          mergedParams = { ...mergedParams, ...config.shareContextParams.default };
+          mergedParams = { ...mergedParams, ...config.shareContextParams.default }
         }
 
         // Apply platform-specific params (higher priority)
         if (platform && config.shareContextParams[platform]) {
-          const platformParams = config.shareContextParams[platform];
+          const platformParams = config.shareContextParams[platform]
           if (platformParams) {
-            mergedParams = { ...mergedParams, ...platformParams };
+            mergedParams = { ...mergedParams, ...platformParams }
           }
         }
       }
 
       // Filter out parameters that should not be shared
       if (config.excludeFromShares && config.excludeFromShares.length > 0) {
-        const excludeSet = new Set(config.excludeFromShares);
+        const excludeSet = new Set(config.excludeFromShares)
         mergedParams = Object.fromEntries(
           Object.entries(mergedParams).filter(([key]) => {
             // Convert to snake_case for comparison if needed
-            const snakeKey = isSnakeCaseUtmKey(key) ? key : `utm_${key.slice(3).replace(/([A-Z])/g, '_$1').toLowerCase()}`;
-            return !excludeSet.has(snakeKey) && !excludeSet.has(key);
-          })
-        ) as UtmParameters;
+            const snakeKey = isSnakeCaseUtmKey(key)
+              ? key
+              : `utm_${key
+                  .slice(3)
+                  .replace(/([A-Z])/g, '_$1')
+                  .toLowerCase()}`
+            return !excludeSet.has(snakeKey) && !excludeSet.has(key)
+          }),
+        ) as UtmParameters
       }
 
       // If no parameters to append, return URL unchanged
       if (!checkHasParams(mergedParams)) {
-        return url;
+        return url
       }
 
-      return appendUtmParameters(url, mergedParams);
+      return appendUtmParameters(url, mergedParams)
     },
-    [isEnabled, config, utmParameters]
-  );
+    [isEnabled, config, utmParameters],
+  )
 
   // Auto-capture on mount if configured
   useEffect(() => {
     if (hasInitialized.current) {
-      return;
+      return
     }
-    hasInitialized.current = true;
+    hasInitialized.current = true
 
     if (isEnabled && config.captureOnMount) {
-      capture();
+      capture()
     }
-  }, [isEnabled, config.captureOnMount, capture]);
+  }, [isEnabled, config.captureOnMount, capture])
 
   // Compute hasParams
-  const hasParams = checkHasParams(utmParameters);
+  const hasParams = checkHasParams(utmParameters)
 
   return {
     utmParameters,
@@ -227,5 +232,5 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
     capture,
     clear,
     appendToUrl,
-  };
+  }
 }

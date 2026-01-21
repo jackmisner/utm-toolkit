@@ -5,25 +5,25 @@
  * Supports standard UTM parameters and custom utm_ prefixed parameters.
  */
 
-import type { KeyFormat, UtmParameters } from '../types';
-import { convertParams, isSnakeCaseUtmKey } from './keys';
+import type { KeyFormat, UtmParameters } from '../types'
+import { convertParams, isSnakeCaseUtmKey } from './keys'
 
 /**
  * Options for capturing UTM parameters
  */
 export interface CaptureOptions {
   /** Target key format for returned parameters (default: 'snake_case') */
-  keyFormat?: KeyFormat;
+  keyFormat?: KeyFormat
 
   /** Allowlist of parameters to capture (snake_case format, e.g., ['utm_source', 'utm_campaign']) */
-  allowedParameters?: string[];
+  allowedParameters?: string[]
 }
 
 /**
  * Check if we're in a browser environment with access to window
  */
 function isBrowser(): boolean {
-  return typeof window !== 'undefined' && typeof window.location !== 'undefined';
+  return typeof window !== 'undefined' && typeof window.location !== 'undefined'
 }
 
 /**
@@ -58,28 +58,25 @@ function isBrowser(): boolean {
  * // Returns: { utm_source: 'linkedin', utm_campaign: 'test' }
  * ```
  */
-export function captureUtmParameters(
-  url?: string,
-  options: CaptureOptions = {}
-): UtmParameters {
-  const { keyFormat = 'snake_case', allowedParameters } = options;
+export function captureUtmParameters(url?: string, options: CaptureOptions = {}): UtmParameters {
+  const { keyFormat = 'snake_case', allowedParameters } = options
 
   // Get URL, defaulting to current page URL in browser
-  const urlString = url ?? (isBrowser() ? window.location.href : '');
+  const urlString = url ?? (isBrowser() ? window.location.href : '')
 
   // SSR safety: return empty object if no URL available
   if (!urlString) {
-    return {};
+    return {}
   }
 
   try {
     // Parse the URL to extract query parameters
-    const urlObj = new URL(urlString);
-    const params: Record<string, string> = {};
+    const urlObj = new URL(urlString)
+    const params: Record<string, string> = {}
 
     // Create a set of allowed parameters for O(1) lookup
     const allowedSet =
-      allowedParameters && allowedParameters.length > 0 ? new Set(allowedParameters) : null;
+      allowedParameters && allowedParameters.length > 0 ? new Set(allowedParameters) : null
 
     // Iterate through all query parameters
     for (const [key, value] of urlObj.searchParams.entries()) {
@@ -87,27 +84,27 @@ export function captureUtmParameters(
       if (isSnakeCaseUtmKey(key)) {
         // If allowedParameters is provided, check if this parameter is allowed
         if (allowedSet === null || allowedSet.has(key)) {
-          params[key] = value;
+          params[key] = value
         }
       }
     }
 
     // Convert to target format if needed
     if (keyFormat === 'camelCase') {
-      return convertParams(params as UtmParameters, 'camelCase');
+      return convertParams(params as UtmParameters, 'camelCase')
     }
 
-    return params as UtmParameters;
+    return params as UtmParameters
   } catch (error) {
     // If URL parsing fails, return empty object
     // This ensures the function is robust and doesn't break the app
     if (typeof console !== 'undefined' && console.warn) {
       console.warn(
         'Failed to parse URL for UTM parameters:',
-        error instanceof Error ? error.message : 'Unknown error'
-      );
+        error instanceof Error ? error.message : 'Unknown error',
+      )
     }
-    return {};
+    return {}
   }
 }
 
@@ -127,12 +124,12 @@ export function captureUtmParameters(
  */
 export function hasUtmParameters(params: UtmParameters | null | undefined): boolean {
   if (!params || typeof params !== 'object') {
-    return false;
+    return false
   }
 
   return Object.values(params).some(
-    (value) => value !== undefined && value !== null && value !== ''
-  );
+    (value) => value !== undefined && value !== null && value !== '',
+  )
 }
 
 /**
@@ -143,7 +140,7 @@ export function hasUtmParameters(params: UtmParameters | null | undefined): bool
  * @returns UTM parameters from current URL, or empty object if SSR
  */
 export function captureFromCurrentUrl(options: CaptureOptions = {}): UtmParameters {
-  return captureUtmParameters(undefined, options);
+  return captureUtmParameters(undefined, options)
 }
 
 /**
@@ -154,14 +151,12 @@ export function captureFromCurrentUrl(options: CaptureOptions = {}): UtmParamete
  * @returns Object with utm parameters and referrer
  */
 export function captureWithReferrer(options: CaptureOptions = {}): {
-  params: UtmParameters;
-  referrer: string | null;
+  params: UtmParameters
+  referrer: string | null
 } {
-  const params = captureFromCurrentUrl(options);
+  const params = captureFromCurrentUrl(options)
   const referrer =
-    isBrowser() && typeof document !== 'undefined' && document.referrer
-      ? document.referrer
-      : null;
+    isBrowser() && typeof document !== 'undefined' && document.referrer ? document.referrer : null
 
-  return { params, referrer };
+  return { params, referrer }
 }

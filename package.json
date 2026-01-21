@@ -43,6 +43,8 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "lint": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\"",
     "prepublishOnly": "npm run clean && npm run build && npm run test"
   },
   "peerDependencies": {
@@ -58,6 +60,7 @@
     "@types/react": "^18.0.0",
     "@vitest/coverage-v8": "^2.0.0",
     "jsdom": "^25.0.0",
+    "prettier": "^3.0.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "typescript": "^5.0.0",

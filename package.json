@@ -3,28 +3,28 @@
   "version": "0.1.2",
   "description": "Capture, store, and append UTM tracking parameters",
   "type": "module",
-  "main": "./dist/cjs/index.js",
-  "module": "./dist/esm/index.js",
-  "types": "./dist/types/index.d.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/types/index.d.ts",
-        "default": "./dist/esm/index.js"
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
       },
       "require": {
-        "types": "./dist/types/index.d.ts",
-        "default": "./dist/cjs/index.js"
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
       }
     },
     "./react": {
       "import": {
-        "types": "./dist/types/react/index.d.ts",
-        "default": "./dist/esm/react/index.js"
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
       },
       "require": {
-        "types": "./dist/types/react/index.d.ts",
-        "default": "./dist/cjs/react/index.js"
+        "types": "./dist/react/index.d.cts",
+        "default": "./dist/react/index.cjs"
       }
     }
   },
@@ -34,10 +34,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "npm run build:esm && npm run build:cjs && npm run build:types",
-    "build:esm": "tsc -p tsconfig.json",
-    "build:cjs": "tsc -p tsconfig.cjs.json",
-    "build:types": "tsc -p tsconfig.json --declaration --emitDeclarationOnly --outDir dist/types",
+    "build": "tsup",
     "clean": "rm -rf dist",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -69,6 +66,7 @@
     "prettier": "^3.0.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
+    "tsup": "^8.5.1",
     "typescript": "^5.0.0",
     "vitest": "^2.0.0"
   },

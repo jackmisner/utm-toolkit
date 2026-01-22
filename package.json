@@ -1,6 +1,6 @@
 {
   "name": "@jackmisner/utm-toolkit",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Capture, store, and append UTM tracking parameters",
   "type": "module",
   "main": "./dist/index.cjs",

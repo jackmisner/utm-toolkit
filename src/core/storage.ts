@@ -1,16 +1,16 @@
 /**
  * UTM Parameter Storage Utility
  *
- * Manages persistence of UTM parameters in sessionStorage.
- * UTM parameters are stored for the duration of the browser session and
- * cleared when the browser/tab is closed.
+ * Manages persistence of UTM parameters in browser storage.
+ * Supports sessionStorage (ephemeral) and localStorage (persistent, optionally with TTL).
+ * Data is stored in an envelope format: { params, iat, eat }.
  */
 
-import type { KeyFormat, UtmParameters } from '../types'
+import type { KeyFormat, StorageType, UtmParameters } from '../types'
 import { convertParams, isSnakeCaseUtmKey, isCamelCaseUtmKey, isUtmKey } from './keys'
 
 /**
- * Default storage key for UTM parameters in sessionStorage
+ * Default storage key for UTM parameters
  */
 export const DEFAULT_STORAGE_KEY = 'utm_parameters'
 
@@ -23,24 +23,90 @@ export interface StorageOptions {
 
   /** Key format to store parameters in (default: 'snake_case') */
   keyFormat?: KeyFormat
+
+  /** Storage backend: 'session' or 'local' (default: 'session') */
+  storageType?: StorageType
+
+  /** TTL in milliseconds (only applies to localStorage, ignored for sessionStorage) */
+  ttl?: number
 }
 
 /**
- * Check if sessionStorage is available
+ * Internal envelope format for stored data
  */
-function isStorageAvailable(): boolean {
+interface StoredUtmEnvelope {
+  params: UtmParameters
+  /** Issued at (timestamp in ms) */
+  iat: number
+  /** Expires at (timestamp in ms, or null for no expiry) */
+  eat: number | null
+}
+
+/**
+ * Get the browser storage backend for the given type
+ */
+function getStorageBackend(type: StorageType = 'session'): Storage | null {
   try {
-    if (typeof sessionStorage === 'undefined') {
-      return false
+    const storage = type === 'local' ? localStorage : sessionStorage
+    if (typeof storage === 'undefined') {
+      return null
     }
     // Test write/read to ensure it's actually functional
     const testKey = '__utm_test__'
-    sessionStorage.setItem(testKey, 'test')
-    sessionStorage.removeItem(testKey)
-    return true
+    storage.setItem(testKey, 'test')
+    storage.removeItem(testKey)
+    return storage
   } catch {
+    return null
+  }
+}
+
+/**
+ * Check if a storage backend is available
+ *
+ * @param type - Storage type to check (default: 'session')
+ * @returns True if the storage backend is available and functional
+ */
+export function isStorageAvailable(type: StorageType = 'session'): boolean {
+  return getStorageBackend(type) !== null
+}
+
+/**
+ * Check if sessionStorage is available in the current environment
+ *
+ * @deprecated Use isStorageAvailable('session') instead
+ * @returns True if sessionStorage is available and functional
+ */
+export function isSessionStorageAvailable(): boolean {
+  return isStorageAvailable('session')
+}
+
+/**
+ * Check if localStorage is available in the current environment
+ *
+ * @returns True if localStorage is available and functional
+ */
+export function isLocalStorageAvailable(): boolean {
+  return isStorageAvailable('local')
+}
+
+/**
+ * Detect whether stored data is in the new envelope format or the old flat format
+ */
+function isEnvelopeFormat(data: unknown): data is StoredUtmEnvelope {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     return false
   }
+  const obj = data as Record<string, unknown>
+  return (
+    'params' in obj &&
+    typeof obj.params === 'object' &&
+    obj.params !== null &&
+    'iat' in obj &&
+    typeof obj.iat === 'number' &&
+    'eat' in obj &&
+    (obj.eat === null || typeof obj.eat === 'number')
+  )
 }
 
 /**
@@ -79,39 +145,39 @@ function isValidStoredData(data: unknown, keyFormat?: KeyFormat): data is UtmPar
 }
 
 /**
- * Stores UTM parameters in sessionStorage
+ * Stores UTM parameters in browser storage
  *
- * Serializes the parameters as JSON and stores them for the duration of the session.
- * If storage fails (quota exceeded, permissions, etc.), fails silently to avoid
- * disrupting the user experience.
- * SSR-safe: returns early if sessionStorage is unavailable.
+ * Serializes the parameters in envelope format { params, iat, eat } and stores them.
+ * For sessionStorage, eat is always null (session handles expiry).
+ * For localStorage, eat is calculated from TTL if provided, otherwise null.
+ * If storage fails (quota exceeded, permissions, etc.), fails silently.
+ * SSR-safe: returns early if storage is unavailable.
  *
  * @param params - UTM parameters to store
- * @param options - Storage options including key and format
+ * @param options - Storage options including key, format, type, and TTL
  *
  * @example
  * ```typescript
- * // Store with default key
- * storeUtmParameters({
- *   utm_source: 'linkedin',
- *   utm_campaign: 'spring2025'
- * })
+ * // Store in sessionStorage (default)
+ * storeUtmParameters({ utm_source: 'linkedin' })
  *
- * // Store with custom key
- * storeUtmParameters(params, { storageKey: 'myapp_utm' })
+ * // Store in localStorage
+ * storeUtmParameters({ utm_source: 'linkedin' }, { storageType: 'local' })
  *
- * // Store in camelCase format
- * storeUtmParameters(
- *   { utmSource: 'linkedin' },
- *   { keyFormat: 'camelCase' }
- * )
+ * // Store in localStorage with 1-hour TTL
+ * storeUtmParameters({ utm_source: 'linkedin' }, { storageType: 'local', ttl: 3600000 })
  * ```
  */
 export function storeUtmParameters(params: UtmParameters, options: StorageOptions = {}): void {
-  const { storageKey = DEFAULT_STORAGE_KEY, keyFormat = 'snake_case' } = options
+  const {
+    storageKey = DEFAULT_STORAGE_KEY,
+    keyFormat = 'snake_case',
+    storageType = 'session',
+    ttl,
+  } = options
 
-  // SSR safety
-  if (!isStorageAvailable()) {
+  const storage = getStorageBackend(storageType)
+  if (!storage) {
     return
   }
 
@@ -123,14 +189,19 @@ export function storeUtmParameters(params: UtmParameters, options: StorageOption
 
     // Convert to target format before storing
     const paramsToStore = convertParams(params, keyFormat)
-    const serialized = JSON.stringify(paramsToStore)
-    sessionStorage.setItem(storageKey, serialized)
+
+    // Build envelope — TTL only applies to localStorage
+    const now = Date.now()
+    const eat = storageType === 'local' && typeof ttl === 'number' && ttl > 0 ? now + ttl : null
+    const envelope: StoredUtmEnvelope = {
+      params: paramsToStore,
+      iat: now,
+      eat,
+    }
+
+    const serialized = JSON.stringify(envelope)
+    storage.setItem(storageKey, serialized)
   } catch (error) {
-    // Fail silently - storage errors should not break the app
-    // Common causes:
-    // - QuotaExceededError (storage full)
-    // - SecurityError (storage access denied)
-    // - Circular reference in params (JSON.stringify fails)
     if (typeof console !== 'undefined' && console.warn) {
       console.warn('Failed to store UTM parameters:', error)
     }
@@ -138,41 +209,26 @@ export function storeUtmParameters(params: UtmParameters, options: StorageOption
 }
 
 /**
- * Retrieves stored UTM parameters from sessionStorage
+ * Retrieves stored UTM parameters from browser storage
  *
- * Returns null if no parameters are stored or if deserialization fails.
- * Validates that the stored data is a proper object with valid UTM keys.
- * SSR-safe: returns null if sessionStorage is unavailable.
+ * Returns null if no parameters are stored, data has expired, or deserialization fails.
+ * Handles both envelope format (new) and flat format (backward compat).
+ * Auto-clears expired data from storage.
+ * SSR-safe: returns null if storage is unavailable.
  *
- * @param options - Storage options including key and expected format
- * @returns Stored UTM parameters or null if not found/invalid
- *
- * @example
- * ```typescript
- * // Get with default key
- * const params = getStoredUtmParameters()
- * if (params) {
- *   console.log('UTM Source:', params.utm_source)
- * }
- *
- * // Get with custom key
- * const params = getStoredUtmParameters({ storageKey: 'myapp_utm' })
- *
- * // Get and convert to camelCase
- * const params = getStoredUtmParameters({ keyFormat: 'camelCase' })
- * // Returns: { utmSource: '...', utmCampaign: '...' }
- * ```
+ * @param options - Storage options including key, format, and type
+ * @returns Stored UTM parameters or null if not found/invalid/expired
  */
 export function getStoredUtmParameters(options: StorageOptions = {}): UtmParameters | null {
-  const { storageKey = DEFAULT_STORAGE_KEY, keyFormat } = options
+  const { storageKey = DEFAULT_STORAGE_KEY, keyFormat, storageType = 'session' } = options
 
-  // SSR safety
-  if (!isStorageAvailable()) {
+  const storage = getStorageBackend(storageType)
+  if (!storage) {
     return null
   }
 
   try {
-    const stored = sessionStorage.getItem(storageKey)
+    const stored = storage.getItem(storageKey)
 
     if (stored === null) {
       return null
@@ -180,7 +236,34 @@ export function getStoredUtmParameters(options: StorageOptions = {}): UtmParamet
 
     const parsed: unknown = JSON.parse(stored)
 
-    // Validate the parsed data
+    // Handle envelope format
+    if (isEnvelopeFormat(parsed)) {
+      // Check TTL expiration
+      if (parsed.eat !== null && Date.now() > parsed.eat) {
+        // Expired — auto-clear
+        try {
+          storage.removeItem(storageKey)
+        } catch {
+          // Ignore cleanup errors
+        }
+        return null
+      }
+
+      // Validate the params inside the envelope
+      if (!isValidStoredData(parsed.params)) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('Stored UTM data is invalid, ignoring')
+        }
+        return null
+      }
+
+      if (keyFormat) {
+        return convertParams(parsed.params, keyFormat)
+      }
+      return parsed.params
+    }
+
+    // Backward compatibility: flat format (pre-envelope data)
     if (!isValidStoredData(parsed)) {
       if (typeof console !== 'undefined' && console.warn) {
         console.warn('Stored UTM data is invalid, ignoring')
@@ -188,17 +271,11 @@ export function getStoredUtmParameters(options: StorageOptions = {}): UtmParamet
       return null
     }
 
-    // Convert to requested format if specified
     if (keyFormat) {
       return convertParams(parsed, keyFormat)
     }
-
     return parsed
   } catch (error) {
-    // Fail silently and return null
-    // Common causes:
-    // - JSON.parse error (invalid JSON)
-    // - SecurityError (storage access denied)
     if (typeof console !== 'undefined' && console.warn) {
       console.warn('Failed to retrieve stored UTM parameters:', error)
     }
@@ -207,32 +284,23 @@ export function getStoredUtmParameters(options: StorageOptions = {}): UtmParamet
 }
 
 /**
- * Removes stored UTM parameters from sessionStorage
- *
- * Fails silently if removal fails to avoid disrupting the user experience.
- * SSR-safe: returns early if sessionStorage is unavailable.
+ * Removes stored UTM parameters from browser storage
  *
  * @param storageKey - Storage key to clear (default: 'utm_parameters')
- *
- * @example
- * ```typescript
- * // Clear with default key
- * clearStoredUtmParameters()
- *
- * // Clear with custom key
- * clearStoredUtmParameters('myapp_utm')
- * ```
+ * @param storageType - Storage backend to clear from (default: 'session')
  */
-export function clearStoredUtmParameters(storageKey: string = DEFAULT_STORAGE_KEY): void {
-  // SSR safety
-  if (!isStorageAvailable()) {
+export function clearStoredUtmParameters(
+  storageKey: string = DEFAULT_STORAGE_KEY,
+  storageType: StorageType = 'session',
+): void {
+  const storage = getStorageBackend(storageType)
+  if (!storage) {
     return
   }
 
   try {
-    sessionStorage.removeItem(storageKey)
+    storage.removeItem(storageKey)
   } catch (error) {
-    // Fail silently - removal errors should not break the app
     if (typeof console !== 'undefined' && console.warn) {
       console.warn('Failed to clear UTM parameters:', error)
     }
@@ -240,37 +308,18 @@ export function clearStoredUtmParameters(storageKey: string = DEFAULT_STORAGE_KE
 }
 
 /**
- * Checks if UTM parameters are currently stored
- *
- * Returns true only if valid UTM parameters are stored (not just any data).
- * Returns false if storage is empty, contains invalid data, or access fails.
- * SSR-safe: returns false if sessionStorage is unavailable.
+ * Checks if valid, non-expired UTM parameters are currently stored
  *
  * @param storageKey - Storage key to check (default: 'utm_parameters')
+ * @param storageType - Storage backend to check (default: 'session')
  * @returns True if valid UTM parameters are stored, false otherwise
- *
- * @example
- * ```typescript
- * if (hasStoredUtmParameters()) {
- *   const params = getStoredUtmParameters()
- *   // Use stored parameters
- * } else {
- *   // Capture new parameters
- * }
- * ```
  */
-export function hasStoredUtmParameters(storageKey: string = DEFAULT_STORAGE_KEY): boolean {
-  const params = getStoredUtmParameters({ storageKey })
+export function hasStoredUtmParameters(
+  storageKey: string = DEFAULT_STORAGE_KEY,
+  storageType: StorageType = 'session',
+): boolean {
+  const params = getStoredUtmParameters({ storageKey, storageType })
   return params !== null && Object.keys(params).length > 0
-}
-
-/**
- * Check if sessionStorage is available in the current environment
- *
- * @returns True if sessionStorage is available and functional
- */
-export function isSessionStorageAvailable(): boolean {
-  return isStorageAvailable()
 }
 
 /**
@@ -278,15 +327,20 @@ export function isSessionStorageAvailable(): boolean {
  * Useful for debugging
  *
  * @param storageKey - Storage key to read (default: 'utm_parameters')
+ * @param storageType - Storage backend to read from (default: 'session')
  * @returns Raw string value or null
  */
-export function getRawStoredValue(storageKey: string = DEFAULT_STORAGE_KEY): string | null {
-  if (!isStorageAvailable()) {
+export function getRawStoredValue(
+  storageKey: string = DEFAULT_STORAGE_KEY,
+  storageType: StorageType = 'session',
+): string | null {
+  const storage = getStorageBackend(storageType)
+  if (!storage) {
     return null
   }
 
   try {
-    return sessionStorage.getItem(storageKey)
+    return storage.getItem(storageKey)
   } catch {
     return null
   }

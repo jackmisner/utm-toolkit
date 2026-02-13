@@ -10,7 +10,7 @@ Path: @/src/react
 
 ### How it fits into the larger codebase
 
-- `useUtmTracking` is the primary orchestrator: it calls `createConfig()` from `@/src/config`, then uses `captureUtmParameters`, `storeUtmParameters`, `getStoredUtmParameters`, `clearStoredUtmParameters`, `appendUtmParameters`, `convertParams`, and `isSnakeCaseUtmKey` from `@/src/core`.
+- `useUtmTracking` is the primary orchestrator: it calls `createConfig()` from `@/src/config`, then uses `captureUtmParameters`, `storeUtmParameters`, `getStoredUtmParameters`, `clearStoredUtmParameters`, `appendUtmParameters`, `convertParams`, and `isSnakeCaseUtmKey` from `@/src/core`. It forwards `storageType` and `ttl` from config to all storage operations.
 - `UtmProvider` wraps `useUtmTracking` in a React context, enabling tree-wide access via `useUtmContext()`.
 - React is externalized in the build (`tsup.config.ts` declares `external: ['react']`) and declared as an optional peer dependency. The core library works without React.
 - Types (`UseUtmTrackingReturn`, `UtmProviderProps`, etc.) come from `@/src/types`.
@@ -23,17 +23,17 @@ Path: @/src/react
 Mount
   |
   v
-useState initializer --> getStoredUtmParameters() --> initial state from sessionStorage
+useState initializer --> getStoredUtmParameters({storageType}) --> initial state from storage
   |
   v
 useEffect (once, via ref guard) --> if captureOnMount && enabled:
   |
   v
 capture() --> captureUtmParameters(window.location.href, {sanitize, piiFiltering}) --> if has params:
-  |                                                            storeUtmParameters()
+  |                                                            storeUtmParameters({storageType, ttl})
   |                                                            setUtmParameters()
   |                                                          else if has defaultParams:
-  |                                                            store & set defaults
+  |                                                            store & set defaults (with storageType, ttl)
   v
 appendToUrl(url, platform?) --> merges: captured params < default share context < platform context
   |                             --> filters out excludeFromShares
@@ -53,6 +53,7 @@ URL with UTM params
 - **Config is frozen at mount**: The `useRef` pattern means the resolved config never changes. If a consumer passes new config props, they will be ignored after the first render.
 - **Initialization guard**: `hasInitialized.current` is a ref (not state), so the guard works correctly across strict mode double-effects without triggering re-renders.
 - **`appendToUrl` exclusion logic**: The `excludeFromShares` filter converts camelCase keys to snake_case using inline regex (not the `toSnakeCase` utility), so it duplicates some conversion logic from `@/src/core/keys.ts`.
+- **Storage options forwarding**: The hook passes `storageType` and `ttl` from the resolved config to `storeUtmParameters`, `getStoredUtmParameters`, and `clearStoredUtmParameters`. The `clear` callback passes `storageType` so it clears the correct backend.
 - **SSR safety**: The `useState` initializer checks `typeof window === 'undefined'` and returns `null` for server rendering. The `capture` callback also checks before accessing `window.location`.
 
 Created and maintained by Nori.

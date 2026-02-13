@@ -18,9 +18,9 @@ Path: @/src/types
 
 ### Core Implementation
 
-- `KeyFormat` is a string literal union (`'snake_case' | 'camelCase'`) that controls key conversion throughout the library.
+- `KeyFormat` is a string literal union (`'snake_case' | 'camelCase'`) that controls key conversion throughout the library. `StorageType` is a string literal union (`'session' | 'local'`) that controls which browser storage backend is used.
 - `UtmParametersSnake` uses an index signature `[key: \`utm_${string}\`]` to accept arbitrary `utm_*` keys while also declaring the standard ones explicitly. `UtmParametersCamel` uses a broader `[key: string]` index signature since TypeScript template literals cannot express the camelCase pattern.
-- `ResolvedUtmConfig` mirrors `UtmConfig` but with all fields required -- it represents the result of merging user-provided partial config with defaults.
+- `ResolvedUtmConfig` mirrors `UtmConfig` but with all fields required (except `ttl`, which remains optional) -- it represents the result of merging user-provided partial config with defaults. Both `UtmConfig` and `ResolvedUtmConfig` include `storageType` (defaulting to `'session'`) and an optional `ttl` (milliseconds, only meaningful for localStorage).
 - `ShareContextParams` uses `Partial<Record<SharePlatform, UtmParameters>>` with a `default` key for base params and platform-specific overrides, enabling a layered merge strategy in `useUtmTracking`'s `appendToUrl` callback.
 - `AppendOptions` controls whether UTM params go into query string or fragment, and whether existing UTM params on the target URL are preserved.
 - `SanitizeConfig` defines value sanitization behavior with fields for `enabled`, `stripHtml`, `stripControlChars`, `maxLength`, and an optional `customPattern` (RegExp). It appears as `Partial<SanitizeConfig>` on `UtmConfig` (user input) and as a required `SanitizeConfig` on `ResolvedUtmConfig` (resolved output). This follows the same partial-in/resolved-out pattern used by the rest of the config system.

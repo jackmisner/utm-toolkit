@@ -6,6 +6,13 @@
 export type KeyFormat = 'snake_case' | 'camelCase'
 
 /**
+ * Storage backend options
+ * - 'session': sessionStorage (cleared when tab/browser closes)
+ * - 'local': localStorage (persists across sessions, optionally with TTL)
+ */
+export type StorageType = 'session' | 'local'
+
+/**
  * Standard UTM parameter keys in snake_case (URL format)
  */
 export type StandardSnakeCaseUtmKey =
@@ -175,8 +182,14 @@ export interface UtmConfig {
   /** Key format for returned UTM parameters (default: 'snake_case') */
   keyFormat?: KeyFormat
 
-  /** Storage key prefix for sessionStorage (default: 'utm_parameters') */
+  /** Storage key for browser storage (default: 'utm_parameters') */
   storageKey?: string
+
+  /** Storage backend: 'session' for sessionStorage, 'local' for localStorage (default: 'session') */
+  storageType?: StorageType
+
+  /** Time-to-live in milliseconds for stored parameters (only applies to localStorage) */
+  ttl?: number
 
   /** Auto-capture UTM params on React hook mount (default: true) */
   captureOnMount?: boolean
@@ -213,6 +226,8 @@ export interface ResolvedUtmConfig {
   enabled: boolean
   keyFormat: KeyFormat
   storageKey: string
+  storageType: StorageType
+  ttl?: number
   captureOnMount: boolean
   appendToShares: boolean
   allowedParameters: string[]
@@ -284,6 +299,6 @@ export interface DiagnosticInfo {
   /** Storage key being used */
   storageKey: string
 
-  /** Whether sessionStorage is available */
+  /** Whether the configured storage backend is available */
   storageAvailable: boolean
 }

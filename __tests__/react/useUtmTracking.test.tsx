@@ -88,7 +88,9 @@ describe('useUtmTracking', () => {
       })
 
       const stored = sessionStorage.getItem('utm_parameters')
-      expect(stored).toBe('{"utm_source":"captured"}')
+      expect(stored).not.toBeNull()
+      const parsed = JSON.parse(stored!)
+      expect(parsed.params).toEqual({ utm_source: 'captured' })
     })
 
     it('uses default params when no UTM params in URL', () => {
@@ -349,6 +351,86 @@ describe('useUtmTracking', () => {
 
       expect(result.current.utmParameters).not.toHaveProperty('utm_source')
       expect(result.current.utmParameters?.utm_medium).toBe('email')
+    })
+  })
+
+  describe('storage type', () => {
+    it('stores captured params in localStorage when storageType is local', () => {
+      vi.stubGlobal('location', {
+        href: 'https://example.com?utm_source=local_test',
+        search: '?utm_source=local_test',
+      })
+
+      const { result } = renderHook(() =>
+        useUtmTracking({
+          config: { captureOnMount: false, storageType: 'local' },
+        }),
+      )
+
+      act(() => {
+        result.current.capture()
+      })
+
+      const raw = localStorage.getItem('utm_parameters')
+      expect(raw).not.toBeNull()
+      expect(sessionStorage.getItem('utm_parameters')).toBeNull()
+    })
+
+    it('initializes from localStorage when storageType is local', () => {
+      // Pre-populate localStorage with envelope format
+      const envelope = JSON.stringify({
+        params: { utm_source: 'stored_local' },
+        iat: Date.now(),
+        eat: null,
+      })
+      localStorage.setItem('utm_parameters', envelope)
+
+      const { result } = renderHook(() => useUtmTracking({ config: { storageType: 'local' } }))
+
+      expect(result.current.utmParameters).toEqual({ utm_source: 'stored_local' })
+    })
+
+    it('stores captured params with TTL when configured', () => {
+      vi.stubGlobal('location', {
+        href: 'https://example.com?utm_source=ttl_test',
+        search: '?utm_source=ttl_test',
+      })
+
+      const ttl = 3600000 // 1 hour
+      const before = Date.now()
+      const { result } = renderHook(() =>
+        useUtmTracking({
+          config: { captureOnMount: false, storageType: 'local', ttl },
+        }),
+      )
+
+      act(() => {
+        result.current.capture()
+      })
+
+      const raw = localStorage.getItem('utm_parameters')
+      expect(raw).not.toBeNull()
+      const parsed = JSON.parse(raw!)
+      expect(parsed.params).toEqual({ utm_source: 'ttl_test' })
+      expect(parsed.eat).toBeGreaterThanOrEqual(before + ttl)
+    })
+
+    it('clears localStorage when storageType is local', () => {
+      const envelope = JSON.stringify({
+        params: { utm_source: 'test' },
+        iat: Date.now(),
+        eat: null,
+      })
+      localStorage.setItem('utm_parameters', envelope)
+
+      const { result } = renderHook(() => useUtmTracking({ config: { storageType: 'local' } }))
+
+      act(() => {
+        result.current.clear()
+      })
+
+      expect(result.current.utmParameters).toBeNull()
+      expect(localStorage.getItem('utm_parameters')).toBeNull()
     })
   })
 

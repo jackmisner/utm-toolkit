@@ -26,6 +26,9 @@ beforeEach(() => {
   const sessionStorageMock = createStorageMock()
   vi.stubGlobal('sessionStorage', sessionStorageMock)
 
+  const localStorageMock = createStorageMock()
+  vi.stubGlobal('localStorage', localStorageMock)
+
   // Reset location mock
   vi.stubGlobal('location', {
     href: 'https://example.com',

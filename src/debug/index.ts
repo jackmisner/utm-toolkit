@@ -8,11 +8,7 @@
 
 import type { DiagnosticInfo, ResolvedUtmConfig } from '../types'
 import { captureUtmParameters } from '../core/capture'
-import {
-  getStoredUtmParameters,
-  isSessionStorageAvailable,
-  getRawStoredValue,
-} from '../core/storage'
+import { getStoredUtmParameters, isStorageAvailable, getRawStoredValue } from '../core/storage'
 import { getDefaultConfig } from '../config/defaults'
 
 /**
@@ -47,6 +43,7 @@ export function getDiagnostics(config?: ResolvedUtmConfig): DiagnosticInfo {
   const storedParams = getStoredUtmParameters({
     storageKey: resolvedConfig.storageKey,
     keyFormat: resolvedConfig.keyFormat,
+    storageType: resolvedConfig.storageType,
   })
 
   return {
@@ -56,7 +53,7 @@ export function getDiagnostics(config?: ResolvedUtmConfig): DiagnosticInfo {
     urlParams,
     storedParams,
     storageKey: resolvedConfig.storageKey,
-    storageAvailable: isSessionStorageAvailable(),
+    storageAvailable: isStorageAvailable(resolvedConfig.storageType),
   }
 }
 
@@ -77,6 +74,7 @@ export function debugUtmState(config?: ResolvedUtmConfig): void {
   console.group('📊 UTM Toolkit Debug Info')
   console.log('Enabled:', diagnostics.enabled)
   console.log('Key Format:', diagnostics.config.keyFormat)
+  console.log('Storage Type:', diagnostics.config.storageType)
   console.log('Storage Key:', diagnostics.storageKey)
   console.log('Storage Available:', diagnostics.storageAvailable)
   console.log('Current URL:', diagnostics.currentUrl)
@@ -133,7 +131,9 @@ export function checkUtmTracking(config?: ResolvedUtmConfig): string[] {
   }
 
   if (!diagnostics.storageAvailable) {
-    messages.push('⚠️ sessionStorage is not available (private browsing or SSR?)')
+    const storageLabel =
+      diagnostics.config.storageType === 'local' ? 'localStorage' : 'sessionStorage'
+    messages.push(`⚠️ ${storageLabel} is not available (private browsing or SSR?)`)
   }
 
   const urlParamCount = Object.keys(diagnostics.urlParams).length
@@ -212,8 +212,9 @@ export function installDebugHelpers(config?: ResolvedUtmConfig): void {
     /** Get raw storage value */
     raw: (storageKey?: string) => {
       const key = storageKey || config?.storageKey || 'utm_parameters'
-      const raw = getRawStoredValue(key)
-      console.log(`Raw storage value for "${key}":`, raw)
+      const storageType = config?.storageType || 'session'
+      const raw = getRawStoredValue(key, storageType)
+      console.log(`Raw storage value for "${key}" (${storageType}):`, raw)
       return raw
     },
   }

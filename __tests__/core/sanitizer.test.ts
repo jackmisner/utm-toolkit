@@ -104,6 +104,14 @@ describe('sanitizeValue', () => {
     })
   })
 
+  describe('enabled flag', () => {
+    it('returns value unchanged when enabled is false', () => {
+      const config: SanitizeConfig = { ...defaultConfig, enabled: false }
+      const result = sanitizeValue('<script>alert("xss")</script>', config)
+      expect(result).toBe('<script>alert("xss")</script>')
+    })
+  })
+
   describe('edge cases', () => {
     it('returns empty string when everything is stripped', () => {
       const result = sanitizeValue('<>"\'`', defaultConfig)
@@ -172,6 +180,19 @@ describe('sanitizeParams', () => {
   it('returns empty object for empty input', () => {
     const result = sanitizeParams({}, defaultConfig)
     expect(result).toEqual({})
+  })
+
+  it('returns params unchanged when enabled is false', () => {
+    const config: SanitizeConfig = { ...defaultConfig, enabled: false }
+    const params = {
+      utm_source: '<script>bad</script>',
+      utm_medium: 'email',
+    }
+    const result = sanitizeParams(params, config)
+    expect(result).toEqual({
+      utm_source: '<script>bad</script>',
+      utm_medium: 'email',
+    })
   })
 
   it('works with camelCase keys', () => {

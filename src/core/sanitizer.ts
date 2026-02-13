@@ -17,6 +17,10 @@ import type { SanitizeConfig, UtmParameters } from '../types'
  * @returns Sanitized value
  */
 export function sanitizeValue(value: string, config: SanitizeConfig): string {
+  if (!config.enabled) {
+    return value
+  }
+
   let result = value
 
   if (config.stripHtml) {
@@ -53,6 +57,10 @@ export function sanitizeValue(value: string, config: SanitizeConfig): string {
  * @returns New object with sanitized values
  */
 export function sanitizeParams(params: UtmParameters, config: SanitizeConfig): UtmParameters {
+  if (!config.enabled) {
+    return { ...params }
+  }
+
   const result: Record<string, string | undefined> = {}
 
   for (const [key, value] of Object.entries(params)) {

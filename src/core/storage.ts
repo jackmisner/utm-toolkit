@@ -190,7 +190,7 @@ export function storeUtmParameters(params: UtmParameters, options: StorageOption
 
     // Build envelope — TTL only applies to localStorage
     const now = Date.now()
-    const eat = storageType === 'local' && ttl ? now + ttl : null
+    const eat = storageType === 'local' && typeof ttl === 'number' && ttl > 0 ? now + ttl : null
     const envelope: StoredUtmEnvelope = {
       params: paramsToStore,
       iat: now,

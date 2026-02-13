@@ -142,11 +142,19 @@ function autoCreateFields(forms: NodeListOf<Element>, params: UtmParameters): nu
   for (const form of forms) {
     for (const [key, value] of Object.entries(params)) {
       if (value === undefined) continue
-      const input = document.createElement('input')
-      input.type = 'hidden'
-      input.name = key
-      input.value = value
-      form.appendChild(input)
+      // Check if a hidden input with this name already exists
+      const existing = form.querySelector(
+        `input[type="hidden"][name="${key}"]`,
+      ) as HTMLInputElement | null
+      if (existing) {
+        existing.value = value
+      } else {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = key
+        input.value = value
+        form.appendChild(input)
+      }
       count++
     }
   }

@@ -121,8 +121,16 @@ export function observeAndDecorateLinks(options: LinkDecoratorOptions = {}): () 
     return () => {}
   }
 
+  let decorating = false
   const observer = new MutationObserver(() => {
-    decorateLinks(options)
+    // Prevent re-entrant decoration (our own href mutations trigger MutationObserver)
+    if (decorating) return
+    decorating = true
+    try {
+      decorateLinks(options)
+    } finally {
+      decorating = false
+    }
   })
 
   observer.observe(document.body, {

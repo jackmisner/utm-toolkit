@@ -105,6 +105,11 @@ export function storeWithAttribution(
       storeUtmParameters(params, { ...baseStorageOpts, storageKey })
       break
     }
+
+    default: {
+      const _exhaustiveCheck: never = attribution.mode
+      throw new Error(`Unknown attribution mode: ${_exhaustiveCheck}`)
+    }
   }
 }
 

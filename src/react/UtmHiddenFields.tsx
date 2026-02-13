@@ -6,11 +6,10 @@
  */
 
 import React from 'react'
-import type { KeyFormat, TouchType } from '../types'
+import type { KeyFormat } from '../types'
 import { getStoredUtmParameters } from '../common/storage'
 
 export interface UtmHiddenFieldsProps {
-  touch?: TouchType
   keyFormat?: KeyFormat
   prefix?: string
   storageKey?: string

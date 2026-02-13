@@ -5,11 +5,9 @@
  */
 
 import { useMemo } from 'react'
-import type { TouchType } from '../types'
 import { getStoredUtmParameters } from '../common/storage'
 
 export interface UseUtmFormDataOptions {
-  touch?: TouchType
   storageKey?: string
   storageType?: 'session' | 'local'
   keyFormat?: 'snake_case' | 'camelCase'

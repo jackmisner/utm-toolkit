@@ -154,13 +154,24 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
    * Clear stored UTM parameters
    */
   const clear = useCallback(() => {
+    // Clear main key
     clearStoredUtmParameters({
       storageKey: config.storageKey,
       storageType: config.storageType,
       onClear: config.onClear,
     })
+    // Also clear attribution-suffixed keys if attribution is configured
+    const mode = config.attribution?.mode ?? 'last'
+    if (mode === 'first' || mode === 'both') {
+      const firstKey = config.storageKey + (config.attribution?.firstTouchSuffix ?? '_first')
+      clearStoredUtmParameters({ storageKey: firstKey, storageType: config.storageType })
+    }
+    if (mode === 'both') {
+      const lastKey = config.storageKey + (config.attribution?.lastTouchSuffix ?? '_last')
+      clearStoredUtmParameters({ storageKey: lastKey, storageType: config.storageType })
+    }
     setUtmParameters(null)
-  }, [config.storageKey, config.storageType, config.onClear])
+  }, [config.storageKey, config.storageType, config.onClear, config.attribution])
 
   /**
    * Append UTM parameters to a URL

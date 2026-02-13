@@ -5,7 +5,7 @@
  * Supports three strategies: name-based, data-attribute, and auto-create.
  */
 
-import type { KeyFormat, StorageType, TouchType, UtmParameters } from '../types'
+import type { KeyFormat, StorageType, UtmParameters } from '../types'
 import { getStoredUtmParameters } from '../common/storage'
 
 export interface FormPopulateOptions {
@@ -15,8 +15,6 @@ export interface FormPopulateOptions {
   strategy?: 'name' | 'data-attribute' | 'auto-create'
   /** Data attribute name for 'data-attribute' strategy (default: 'data-utm') */
   dataAttribute?: string
-  /** Which touch to populate from (default: 'last') */
-  touch?: TouchType
   /** Key format for field names (default: 'snake_case') */
   keyFormat?: KeyFormat
   /** Storage options for reading params */
@@ -65,7 +63,7 @@ export function populateFormFields(options: FormPopulateOptions = {}): number {
 
 /**
  * Create hidden input elements in matching forms.
- * Returns count of fields created.
+ * Returns count of fields populated (creates new or updates existing).
  */
 export function createUtmHiddenFields(options: Omit<FormPopulateOptions, 'strategy'> = {}): number {
   const { selector = 'form', keyFormat = 'snake_case', storageKey, storageType } = options

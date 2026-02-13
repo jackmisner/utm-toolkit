@@ -5,7 +5,7 @@
  * Supports host filtering, skip-existing, and MutationObserver for SPAs.
  */
 
-import type { StorageType, TouchType, UtmParameters } from '../types'
+import type { StorageType, UtmParameters } from '../types'
 import { getStoredUtmParameters } from '../common/storage'
 import { appendUtmParameters, extractUtmParameters } from './appender'
 
@@ -20,8 +20,6 @@ export interface LinkDecoratorOptions {
   excludeHosts?: string[]
   /** Skip links that already have UTM params (default: true) */
   skipExisting?: boolean
-  /** Which touch params to use (default: 'last') */
-  touch?: TouchType
   /** Additional static params to append */
   extraParams?: UtmParameters
   /** Storage options for reading params */
@@ -117,7 +115,11 @@ export function observeAndDecorateLinks(options: LinkDecoratorOptions = {}): () 
   // Decorate existing links immediately
   decorateLinks(options)
 
-  if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') {
+  if (
+    typeof MutationObserver === 'undefined' ||
+    typeof document === 'undefined' ||
+    !document.body
+  ) {
     return () => {}
   }
 

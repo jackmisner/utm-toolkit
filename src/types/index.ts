@@ -105,6 +105,26 @@ export interface ValidationResult {
 export type ValidationError = 'invalid_protocol' | 'invalid_domain' | 'malformed_url' | 'empty_url'
 
 /**
+ * Configuration for value sanitization
+ */
+export interface SanitizeConfig {
+  /** Enable sanitization (default: false) */
+  enabled: boolean
+
+  /** Strip HTML-significant characters: < > " ' ` (default: true) */
+  stripHtml: boolean
+
+  /** Strip control characters \x00-\x1F except \t \n \r (default: true) */
+  stripControlChars: boolean
+
+  /** Maximum allowed length for parameter values (default: 200) */
+  maxLength: number
+
+  /** Optional additional regex pattern to strip from values */
+  customPattern?: RegExp
+}
+
+/**
  * Main configuration interface for UTM toolkit
  */
 export interface UtmConfig {
@@ -137,6 +157,9 @@ export interface UtmConfig {
 
   /** Parameters to exclude when appending to share URLs (e.g., ['utm_team_id']) */
   excludeFromShares?: string[]
+
+  /** Value sanitization configuration */
+  sanitize?: Partial<SanitizeConfig>
 }
 
 /**
@@ -152,6 +175,7 @@ export interface ResolvedUtmConfig {
   defaultParams: UtmParameters
   shareContextParams: ShareContextParams
   excludeFromShares: string[]
+  sanitize: SanitizeConfig
 }
 
 /**

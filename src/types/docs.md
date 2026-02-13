@@ -23,11 +23,13 @@ Path: @/src/types
 - `ResolvedUtmConfig` mirrors `UtmConfig` but with all fields required -- it represents the result of merging user-provided partial config with defaults.
 - `ShareContextParams` uses `Partial<Record<SharePlatform, UtmParameters>>` with a `default` key for base params and platform-specific overrides, enabling a layered merge strategy in `useUtmTracking`'s `appendToUrl` callback.
 - `AppendOptions` controls whether UTM params go into query string or fragment, and whether existing UTM params on the target URL are preserved.
+- `SanitizeConfig` defines value sanitization behavior with fields for `enabled`, `stripHtml`, `stripControlChars`, `maxLength`, and an optional `customPattern` (RegExp). It appears as `Partial<SanitizeConfig>` on `UtmConfig` (user input) and as a required `SanitizeConfig` on `ResolvedUtmConfig` (resolved output). This follows the same partial-in/resolved-out pattern used by the rest of the config system.
 
 ### Things to Know
 
 - `UtmParameters` is a union, not an intersection. Code that receives it must handle either format, typically by detecting the format or converting via `@/src/core/keys.ts`.
 - `SharePlatform` is `'linkedin' | 'twitter' | 'facebook' | 'copy' | string` -- the named platforms are documentation aids, but any string is accepted.
 - `DiagnosticInfo` is only used by `@/src/debug` and is meant for development-time inspection, not production data flow.
+- New features use a nested config object pattern (e.g., `sanitize: SanitizeConfig`) rather than adding flat fields to `UtmConfig`. Existing flat fields remain unchanged for backward compatibility.
 
 Created and maintained by Nori.

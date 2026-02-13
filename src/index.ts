@@ -48,6 +48,10 @@ export {
   STANDARD_SNAKE_KEYS,
   STANDARD_CAMEL_KEYS,
 
+  // Sanitizer
+  sanitizeValue,
+  sanitizeParams,
+
   // Validator
   validateUrl,
   normalizeUrl,
@@ -64,6 +68,7 @@ export {
 // Configuration
 export {
   DEFAULT_CONFIG,
+  DEFAULT_SANITIZE_CONFIG,
   STANDARD_UTM_PARAMETERS,
   getDefaultConfig,
   createConfig,
@@ -94,4 +99,5 @@ export type {
   UseUtmTrackingReturn,
   UtmProviderProps,
   DiagnosticInfo,
+  SanitizeConfig,
 } from './types'

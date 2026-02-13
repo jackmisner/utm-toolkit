@@ -32,11 +32,11 @@ Consumer API
 
 - **types/** (`@/src/types`): Shared type definitions consumed by all other modules. Defines the dual key format system (snake_case/camelCase) and configuration interfaces.
 - **config/** (`@/src/config`): Pure configuration creation and validation. Merges partial user config with defaults to produce `ResolvedUtmConfig`.
-- **core/** (`@/src/core`): Framework-agnostic UTM operations -- capture from URLs, persist in sessionStorage, append to outbound URLs, convert key formats, validate URLs. All SSR-safe.
+- **core/** (`@/src/core`): Framework-agnostic UTM operations -- capture from URLs, sanitize parameter values, persist in sessionStorage, append to outbound URLs, convert key formats, validate URLs. All SSR-safe.
 - **debug/** (`@/src/debug`): Development-time diagnostics. Assembles state snapshots and provides formatted console output and optional `window.utmDebug` helpers.
 - **react/** (`@/src/react`): React hook and context provider that orchestrate the core modules into stateful React APIs with auto-capture-on-mount behavior.
 
-**Key data flow**: URL with UTM params --> `capture` --> `store` in sessionStorage --> `appendToUrl` for outbound link generation.
+**Key data flow**: URL with UTM params --> `capture` (with optional sanitization) --> `store` in sessionStorage --> `appendToUrl` for outbound link generation.
 
 ### Things to Know
 

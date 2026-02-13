@@ -7,6 +7,7 @@ A comprehensive TypeScript library for capturing, storing, and appending UTM tra
 ## Features
 
 - **Capture** UTM parameters from URLs
+- **Sanitize** parameter values to prevent XSS and injection
 - **Store** in sessionStorage for the browser session
 - **Append** UTM parameters to share URLs
 - **Configurable** key format (snake_case or camelCase)
@@ -110,6 +111,16 @@ const params = captureUtmParameters(url, {
   keyFormat: 'camelCase', // 'snake_case' (default) or 'camelCase'
   allowedParameters: ['utm_source', 'utm_campaign'], // Filter to specific params
 });
+
+// With sanitization (strips HTML, control chars)
+const params = captureUtmParameters(url, {
+  sanitize: {
+    enabled: true,
+    stripHtml: true,        // Remove < > " ' ` (default: true)
+    stripControlChars: true, // Remove control characters (default: true)
+    maxLength: 200,          // Truncate values (default: 200)
+  },
+});
 ```
 
 #### `storeUtmParameters(params, options?)`
@@ -206,6 +217,37 @@ validateAndNormalize('example.com');
 // { valid: true, normalizedUrl: 'https://example.com' }
 ```
 
+### Value Sanitization
+
+Sanitize UTM parameter values to prevent XSS when rendering in HTML or constructing URLs. Sanitization is disabled by default and runs at capture time only.
+
+```typescript
+import { captureUtmParameters, sanitizeValue, sanitizeParams } from '@jackmisner/utm-toolkit';
+
+// Enable sanitization during capture
+const params = captureUtmParameters('https://example.com?utm_source=<script>bad</script>', {
+  sanitize: { enabled: true },
+});
+// { utm_source: 'scriptbad/script' }
+
+// Use standalone sanitization functions
+sanitizeValue('<b>bold</b>', {
+  enabled: true,
+  stripHtml: true,
+  stripControlChars: true,
+  maxLength: 200,
+});
+// 'bbold/b'
+
+// With a custom pattern
+const params = captureUtmParameters(url, {
+  sanitize: {
+    enabled: true,
+    customPattern: /[!@#$%^&*]/g, // Strip additional characters
+  },
+});
+```
+
 ### Configuration
 
 ```typescript
@@ -289,6 +331,7 @@ installDebugHelpers();
 | `defaultParams` | `object` | `{}` | Fallback params when none captured |
 | `shareContextParams` | `object` | `{}` | Platform-specific params |
 | `excludeFromShares` | `string[]` | `[]` | Params to exclude from shares |
+| `sanitize` | `SanitizeConfig` | `{ enabled: false }` | Value sanitization settings |
 
 ## TypeScript Types
 
@@ -296,6 +339,7 @@ installDebugHelpers();
 import type {
   UtmParameters,
   UtmConfig,
+  SanitizeConfig,
   SharePlatform,
   UseUtmTrackingReturn,
 } from '@jackmisner/utm-toolkit';

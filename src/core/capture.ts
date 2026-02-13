@@ -5,8 +5,10 @@
  * Supports standard UTM parameters and custom utm_ prefixed parameters.
  */
 
-import type { KeyFormat, UtmParameters } from '../types'
+import type { KeyFormat, SanitizeConfig, UtmParameters } from '../types'
+import { DEFAULT_SANITIZE_CONFIG } from '../config/defaults'
 import { convertParams, isSnakeCaseUtmKey } from './keys'
+import { sanitizeParams } from './sanitizer'
 
 /**
  * Options for capturing UTM parameters
@@ -17,6 +19,9 @@ export interface CaptureOptions {
 
   /** Allowlist of parameters to capture (snake_case format, e.g., ['utm_source', 'utm_campaign']) */
   allowedParameters?: string[]
+
+  /** Sanitization configuration — when enabled, strips dangerous characters from values */
+  sanitize?: Partial<SanitizeConfig>
 }
 
 /**
@@ -59,7 +64,7 @@ function isBrowser(): boolean {
  * ```
  */
 export function captureUtmParameters(url?: string, options: CaptureOptions = {}): UtmParameters {
-  const { keyFormat = 'snake_case', allowedParameters } = options
+  const { keyFormat = 'snake_case', allowedParameters, sanitize } = options
 
   // Get URL, defaulting to current page URL in browser
   const urlString = url ?? (isBrowser() ? window.location.href : '')
@@ -89,12 +94,18 @@ export function captureUtmParameters(url?: string, options: CaptureOptions = {})
       }
     }
 
+    // Apply sanitization if configured and enabled
+    const resolvedSanitize: SanitizeConfig = { ...DEFAULT_SANITIZE_CONFIG, ...sanitize }
+    const captured: UtmParameters = resolvedSanitize.enabled
+      ? sanitizeParams(params as UtmParameters, resolvedSanitize)
+      : (params as UtmParameters)
+
     // Convert to target format if needed
     if (keyFormat === 'camelCase') {
-      return convertParams(params as UtmParameters, 'camelCase')
+      return convertParams(captured, 'camelCase')
     }
 
-    return params as UtmParameters
+    return captured
   } catch (error) {
     // If URL parsing fails, return empty object
     // This ensures the function is robust and doesn't break the app

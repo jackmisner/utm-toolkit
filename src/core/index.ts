@@ -48,6 +48,9 @@ export {
   STANDARD_CAMEL_KEYS,
 } from './keys'
 
+// Sanitizer utilities
+export { sanitizeValue, sanitizeParams } from './sanitizer'
+
 // Validator utilities
 export {
   validateUrl,

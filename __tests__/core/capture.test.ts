@@ -183,6 +183,53 @@ describe('hasUtmParameters', () => {
   })
 })
 
+describe('sanitization integration', () => {
+  const sanitizeConfig = {
+    enabled: true,
+    stripHtml: true,
+    stripControlChars: true,
+    maxLength: 200,
+  }
+
+  it('sanitizes values when sanitize config is enabled', () => {
+    const result = captureUtmParameters(
+      'https://example.com?utm_source=<script>bad</script>&utm_medium=email',
+      { sanitize: sanitizeConfig },
+    )
+    expect(result.utm_source).toBe('scriptbad/script')
+    expect(result.utm_medium).toBe('email')
+  })
+
+  it('does not sanitize when sanitize is not provided', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=<script>bad</script>')
+    expect(result.utm_source).toBe('<script>bad</script>')
+  })
+
+  it('does not sanitize when sanitize.enabled is false', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=<script>bad</script>', {
+      sanitize: { ...sanitizeConfig, enabled: false },
+    })
+    expect(result.utm_source).toBe('<script>bad</script>')
+  })
+
+  it('sanitizes with camelCase key format', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=<b>bold</b>', {
+      keyFormat: 'camelCase',
+      sanitize: sanitizeConfig,
+    })
+    expect(result.utmSource).toBe('bbold/b')
+  })
+
+  it('sanitizes after allowed parameter filtering', () => {
+    const result = captureUtmParameters(
+      'https://example.com?utm_source=<b>bold</b>&utm_campaign=test',
+      { allowedParameters: ['utm_source'], sanitize: sanitizeConfig },
+    )
+    expect(result.utm_source).toBe('bbold/b')
+    expect(result).not.toHaveProperty('utm_campaign')
+  })
+})
+
 describe('captureFromCurrentUrl', () => {
   beforeEach(() => {
     vi.stubGlobal('location', {

@@ -238,6 +238,102 @@ describe('validateConfig', () => {
   })
 })
 
+describe('sanitize config', () => {
+  it('createConfig includes sanitize defaults when not provided', () => {
+    const config = createConfig()
+    expect(config.sanitize).toEqual({
+      enabled: false,
+      stripHtml: true,
+      stripControlChars: true,
+      maxLength: 200,
+    })
+  })
+
+  it('createConfig merges partial sanitize config with defaults', () => {
+    const config = createConfig({
+      sanitize: { enabled: true, maxLength: 100 },
+    })
+    expect(config.sanitize.enabled).toBe(true)
+    expect(config.sanitize.maxLength).toBe(100)
+    expect(config.sanitize.stripHtml).toBe(true) // default preserved
+    expect(config.sanitize.stripControlChars).toBe(true) // default preserved
+  })
+
+  it('createConfig preserves customPattern when provided', () => {
+    const pattern = /[!@#]/g
+    const config = createConfig({
+      sanitize: { enabled: true, customPattern: pattern },
+    })
+    expect(config.sanitize.customPattern).toBe(pattern)
+  })
+
+  it('mergeConfig merges sanitize overrides', () => {
+    const base = getDefaultConfig()
+    const merged = mergeConfig(base, {
+      sanitize: { enabled: true },
+    })
+    expect(merged.sanitize.enabled).toBe(true)
+    expect(merged.sanitize.stripHtml).toBe(true) // preserved from base
+  })
+
+  it('validateConfig validates sanitize.enabled is boolean', () => {
+    const errors = validateConfig({ sanitize: { enabled: 'yes' } })
+    expect(errors).toContain('sanitize.enabled must be a boolean')
+  })
+
+  it('validateConfig validates sanitize.stripHtml is boolean', () => {
+    const errors = validateConfig({ sanitize: { stripHtml: 123 } })
+    expect(errors).toContain('sanitize.stripHtml must be a boolean')
+  })
+
+  it('validateConfig validates sanitize.stripControlChars is boolean', () => {
+    const errors = validateConfig({ sanitize: { stripControlChars: null } })
+    expect(errors).toContain('sanitize.stripControlChars must be a boolean')
+  })
+
+  it('validateConfig validates sanitize.maxLength is number', () => {
+    const errors = validateConfig({ sanitize: { maxLength: 'big' } })
+    expect(errors).toContain('sanitize.maxLength must be a positive finite number')
+  })
+
+  it('validateConfig validates sanitize.maxLength is positive', () => {
+    const errors = validateConfig({ sanitize: { maxLength: -1 } })
+    expect(errors).toContain('sanitize.maxLength must be a positive finite number')
+  })
+
+  it('validateConfig rejects NaN as sanitize.maxLength', () => {
+    const errors = validateConfig({ sanitize: { maxLength: NaN } })
+    expect(errors).toContain('sanitize.maxLength must be a positive finite number')
+  })
+
+  it('validateConfig rejects Infinity as sanitize.maxLength', () => {
+    const errors = validateConfig({ sanitize: { maxLength: Infinity } })
+    expect(errors).toContain('sanitize.maxLength must be a positive finite number')
+  })
+
+  it('validateConfig validates sanitize.customPattern is a RegExp', () => {
+    const errors = validateConfig({ sanitize: { customPattern: 'not a regex' } })
+    expect(errors).toContain('sanitize.customPattern must be a RegExp')
+  })
+
+  it('validateConfig accepts valid customPattern RegExp', () => {
+    const errors = validateConfig({ sanitize: { customPattern: /[!@#]/g } })
+    expect(errors).toEqual([])
+  })
+
+  it('validateConfig validates sanitize is an object', () => {
+    const errors = validateConfig({ sanitize: 'not an object' })
+    expect(errors).toContain('sanitize must be an object')
+  })
+
+  it('validateConfig accepts valid sanitize config', () => {
+    const errors = validateConfig({
+      sanitize: { enabled: true, stripHtml: true, stripControlChars: true, maxLength: 100 },
+    })
+    expect(errors).toEqual([])
+  })
+})
+
 describe('getDefaultConfig', () => {
   it('returns a copy of default config', () => {
     const config1 = getDefaultConfig()

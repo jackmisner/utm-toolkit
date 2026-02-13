@@ -302,6 +302,31 @@ describe('useUtmTracking', () => {
     })
   })
 
+  describe('sanitization', () => {
+    it('sanitizes captured values when sanitize is enabled', () => {
+      vi.stubGlobal('location', {
+        href: 'https://example.com?utm_source=<script>bad</script>&utm_medium=email',
+        search: '?utm_source=<script>bad</script>&utm_medium=email',
+      })
+
+      const { result } = renderHook(() =>
+        useUtmTracking({
+          config: {
+            captureOnMount: false,
+            sanitize: { enabled: true },
+          },
+        }),
+      )
+
+      act(() => {
+        result.current.capture()
+      })
+
+      expect(result.current.utmParameters?.utm_source).toBe('scriptbad/script')
+      expect(result.current.utmParameters?.utm_medium).toBe('email')
+    })
+  })
+
   describe('key format', () => {
     it('uses snake_case by default', () => {
       vi.stubGlobal('location', {

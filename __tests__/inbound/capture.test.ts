@@ -3,7 +3,7 @@ import {
   captureUtmParameters,
   hasUtmParameters,
   captureFromCurrentUrl,
-} from '../../src/core/capture'
+} from '../../src/inbound/capture'
 
 describe('captureUtmParameters', () => {
   describe('basic extraction', () => {

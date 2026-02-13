@@ -1,17 +1,8 @@
 /**
- * Core exports
+ * Common exports
  *
- * Framework-agnostic utilities for UTM parameter management.
+ * Shared utilities used by both inbound and outbound pathways.
  */
-
-// Capture utilities
-export {
-  captureUtmParameters,
-  hasUtmParameters,
-  captureFromCurrentUrl,
-  captureWithReferrer,
-  type CaptureOptions,
-} from './capture'
 
 // Storage utilities
 export {
@@ -25,10 +16,8 @@ export {
   getRawStoredValue,
   DEFAULT_STORAGE_KEY,
   type StorageOptions,
+  type ClearOptions,
 } from './storage'
-
-// Appender utilities
-export { appendUtmParameters, removeUtmParameters, extractUtmParameters } from './appender'
 
 // Key conversion utilities
 export {
@@ -49,12 +38,6 @@ export {
   STANDARD_SNAKE_KEYS,
   STANDARD_CAMEL_KEYS,
 } from './keys'
-
-// Sanitizer utilities
-export { sanitizeValue, sanitizeParams } from './sanitizer'
-
-// PII filter utilities
-export { detectPii, filterValue, filterParams } from './pii-filter'
 
 // Validator utilities
 export {

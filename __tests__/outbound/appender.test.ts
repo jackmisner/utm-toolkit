@@ -3,7 +3,7 @@ import {
   appendUtmParameters,
   removeUtmParameters,
   extractUtmParameters,
-} from '../../src/core/appender'
+} from '../../src/outbound/appender'
 
 describe('appendUtmParameters', () => {
   describe('basic appending', () => {

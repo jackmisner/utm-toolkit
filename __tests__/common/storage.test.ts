@@ -9,7 +9,7 @@ import {
   isStorageAvailable,
   getRawStoredValue,
   DEFAULT_STORAGE_KEY,
-} from '../../src/core/storage'
+} from '../../src/common/storage'
 
 describe('storeUtmParameters', () => {
   beforeEach(() => {

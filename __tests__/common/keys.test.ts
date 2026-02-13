@@ -12,7 +12,7 @@ import {
   detectKeyFormat,
   normalizeKey,
   toUrlKey,
-} from '../../src/core/keys'
+} from '../../src/common/keys'
 
 describe('toSnakeCase', () => {
   it('converts standard camelCase keys to snake_case', () => {

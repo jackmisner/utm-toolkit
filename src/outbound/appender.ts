@@ -6,7 +6,7 @@
  */
 
 import type { AppendOptions, UtmParameters } from '../types'
-import { toSnakeCaseParams, isSnakeCaseUtmKey, isCamelCaseUtmKey } from './keys'
+import { toSnakeCaseParams, isSnakeCaseUtmKey, isCamelCaseUtmKey } from '../common/keys'
 
 /**
  * Builds a query string with proper handling of empty parameter values
@@ -100,7 +100,7 @@ export function appendUtmParameters(
   utmParams: UtmParameters,
   options: AppendOptions = {},
 ): string {
-  const { toFragment = false, preserveExisting = false } = options
+  const { toFragment = false, preserveExisting = false, onAppend } = options
 
   // Fast-path: nothing to append
   if (!hasValidUtmEntries(utmParams)) {
@@ -119,13 +119,24 @@ export function appendUtmParameters(
     // Parse the URL
     const urlObj = new URL(url)
 
+    let result: string
     if (toFragment) {
       // === FRAGMENT-BASED PARAMETER ADDITION ===
-      return appendToFragment(urlObj, snakeParams, preserveExisting)
+      result = appendToFragment(urlObj, snakeParams, preserveExisting)
     } else {
       // === QUERY-BASED PARAMETER ADDITION (DEFAULT) ===
-      return appendToQuery(urlObj, snakeParams, preserveExisting)
+      result = appendToQuery(urlObj, snakeParams, preserveExisting)
     }
+
+    if (onAppend) {
+      try {
+        onAppend(result, utmParams)
+      } catch {
+        // Callbacks must not break the pipeline
+      }
+    }
+
+    return result
   } catch (error) {
     // If URL parsing fails, return the original URL unchanged
     if (typeof console !== 'undefined' && console.warn) {

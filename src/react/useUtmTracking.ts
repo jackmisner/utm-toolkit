@@ -5,7 +5,7 @@
  * Provides a simple API for UTM tracking throughout React applications.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import type {
   UtmConfig,
   UtmParameters,
@@ -13,14 +13,11 @@ import type {
   SharePlatform,
   UseUtmTrackingReturn,
 } from '../types'
-import { captureUtmParameters, hasUtmParameters as checkHasParams } from '../core/capture'
-import {
-  storeUtmParameters,
-  getStoredUtmParameters,
-  clearStoredUtmParameters,
-} from '../core/storage'
-import { appendUtmParameters } from '../core/appender'
-import { convertParams, isSnakeCaseUtmKey } from '../core/keys'
+import { captureUtmParameters, hasUtmParameters as checkHasParams } from '../inbound/capture'
+import { getStoredUtmParameters, clearStoredUtmParameters } from '../common/storage'
+import { storeWithAttribution } from '../inbound/attribution'
+import { appendUtmParameters } from '../outbound/appender'
+import { convertParams, isSnakeCaseUtmKey } from '../common/keys'
 import { createConfig } from '../config/loader'
 
 /**
@@ -124,25 +121,30 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
       allowedParameters: config.allowedParameters,
       sanitize: config.sanitize,
       piiFiltering: config.piiFiltering,
+      onCapture: config.onCapture,
     })
 
     // Only store if we found some parameters
     if (checkHasParams(params)) {
-      storeUtmParameters(params, {
+      storeWithAttribution(params, {
+        attribution: config.attribution,
         storageKey: config.storageKey,
         keyFormat: config.keyFormat,
         storageType: config.storageType,
         ttl: config.ttl,
+        onStore: config.onStore,
       })
       setUtmParameters(params)
     } else if (checkHasParams(config.defaultParams)) {
       // Use default parameters if no UTMs found and defaults are configured
       const defaultParams = convertParams(config.defaultParams, config.keyFormat)
-      storeUtmParameters(defaultParams, {
+      storeWithAttribution(defaultParams, {
+        attribution: config.attribution,
         storageKey: config.storageKey,
         keyFormat: config.keyFormat,
         storageType: config.storageType,
         ttl: config.ttl,
+        onStore: config.onStore,
       })
       setUtmParameters(defaultParams)
     }
@@ -152,9 +154,24 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
    * Clear stored UTM parameters
    */
   const clear = useCallback(() => {
-    clearStoredUtmParameters(config.storageKey, config.storageType)
+    // Clear main key
+    clearStoredUtmParameters({
+      storageKey: config.storageKey,
+      storageType: config.storageType,
+      onClear: config.onClear,
+    })
+    // Also clear attribution-suffixed keys if attribution is configured
+    const mode = config.attribution?.mode ?? 'last'
+    if (mode === 'first' || mode === 'both') {
+      const firstKey = config.storageKey + (config.attribution?.firstTouchSuffix ?? '_first')
+      clearStoredUtmParameters({ storageKey: firstKey, storageType: config.storageType })
+    }
+    if (mode === 'both') {
+      const lastKey = config.storageKey + (config.attribution?.lastTouchSuffix ?? '_last')
+      clearStoredUtmParameters({ storageKey: lastKey, storageType: config.storageType })
+    }
     setUtmParameters(null)
-  }, [config.storageKey, config.storageType])
+  }, [config.storageKey, config.storageType, config.onClear, config.attribution])
 
   /**
    * Append UTM parameters to a URL
@@ -212,7 +229,7 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
         return url
       }
 
-      return appendUtmParameters(url, mergedParams)
+      return appendUtmParameters(url, mergedParams, { onAppend: config.onAppend })
     },
     [isEnabled, config, utmParameters],
   )
@@ -232,6 +249,36 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
   // Compute hasParams
   const hasParams = checkHasParams(utmParameters)
 
+  // Attribution mode determines which touch params are available
+  const attributionMode = config.attribution?.mode ?? 'last'
+  const firstTouchParams = useMemo(
+    () =>
+      attributionMode === 'last'
+        ? null
+        : getStoredUtmParameters({
+            storageKey: config.storageKey + (config.attribution?.firstTouchSuffix ?? '_first'),
+            keyFormat: config.keyFormat,
+            storageType: config.storageType,
+          }),
+    // Re-read when utmParameters changes (i.e., after capture/store)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [attributionMode, config.storageKey, config.keyFormat, config.storageType, utmParameters],
+  )
+  const lastTouchParams = useMemo(
+    () =>
+      attributionMode === 'first'
+        ? null
+        : attributionMode === 'both'
+          ? getStoredUtmParameters({
+              storageKey: config.storageKey + (config.attribution?.lastTouchSuffix ?? '_last'),
+              keyFormat: config.keyFormat,
+              storageType: config.storageType,
+            })
+          : utmParameters,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [attributionMode, config.storageKey, config.keyFormat, config.storageType, utmParameters],
+  )
+
   return {
     utmParameters,
     isEnabled,
@@ -239,5 +286,7 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
     capture,
     clear,
     appendToUrl,
+    firstTouchParams,
+    lastTouchParams,
   }
 }

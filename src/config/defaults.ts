@@ -4,7 +4,23 @@
  * Provides sensible defaults for UTM toolkit configuration.
  */
 
-import type { PiiFilterConfig, PiiPattern, ResolvedUtmConfig, SanitizeConfig } from '../types'
+import type {
+  AttributionConfig,
+  PiiFilterConfig,
+  PiiPattern,
+  ResolvedUtmConfig,
+  SanitizeConfig,
+} from '../types'
+
+/**
+ * Default attribution configuration
+ * Last-touch only by default (preserves existing behavior)
+ */
+export const DEFAULT_ATTRIBUTION_CONFIG: AttributionConfig = {
+  mode: 'last',
+  firstTouchSuffix: '_first',
+  lastTouchSuffix: '_last',
+}
 
 /**
  * Default sanitization configuration
@@ -105,6 +121,9 @@ export const DEFAULT_CONFIG: ResolvedUtmConfig = {
 
   /** PII filtering disabled by default (deep copy to prevent shared references) */
   piiFiltering: { ...DEFAULT_PII_FILTER_CONFIG, patterns: [...DEFAULT_PII_PATTERNS] },
+
+  /** Last-touch attribution by default */
+  attribution: { ...DEFAULT_ATTRIBUTION_CONFIG },
 }
 
 /**
@@ -123,5 +142,6 @@ export function getDefaultConfig(): ResolvedUtmConfig {
       ...DEFAULT_CONFIG.piiFiltering,
       patterns: DEFAULT_CONFIG.piiFiltering.patterns.map((p) => ({ ...p })),
     },
+    attribution: { ...DEFAULT_CONFIG.attribution },
   }
 }

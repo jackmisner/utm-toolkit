@@ -7,8 +7,8 @@
  */
 
 import type { DiagnosticInfo, ResolvedUtmConfig } from '../types'
-import { captureUtmParameters } from '../core/capture'
-import { getStoredUtmParameters, isStorageAvailable, getRawStoredValue } from '../core/storage'
+import { captureUtmParameters } from '../inbound/capture'
+import { getStoredUtmParameters, isStorageAvailable, getRawStoredValue } from '../common/storage'
 import { getDefaultConfig } from '../config/defaults'
 
 /**

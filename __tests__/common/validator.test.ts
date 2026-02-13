@@ -9,7 +9,7 @@ import {
   getAllowedProtocols,
   isProtocolAllowed,
   getErrorMessage,
-} from '../../src/core/validator'
+} from '../../src/common/validator'
 
 describe('validateUrl', () => {
   describe('valid URLs', () => {

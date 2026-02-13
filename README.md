@@ -6,11 +6,21 @@ A comprehensive TypeScript library for capturing, storing, and appending UTM tra
 
 ## Features
 
+### Inbound (Receiving UTM-tagged traffic)
 - **Capture** UTM parameters from URLs
 - **Sanitize** parameter values to prevent XSS and injection
 - **PII filtering** to detect and reject/redact email addresses, phone numbers, and other PII
 - **Store** in sessionStorage or localStorage (with optional TTL)
+- **Attribution** — first-touch, last-touch, or both
+- **Form population** — inject UTM data into HTML forms (vanilla JS + React)
+
+### Outbound (Creating UTM-tagged links)
 - **Append** UTM parameters to share URLs
+- **Build** UTM-tagged URLs with validation and warnings
+- **Link decoration** — auto-append UTM params to links on a page (vanilla JS + React)
+
+### General
+- **Event callbacks** — lifecycle hooks for capture, store, clear, append, and expiry events
 - **Configurable** key format (snake_case or camelCase)
 - **Platform-specific** share context parameters
 - **Fragment mode** support (add params to `#hash` instead of `?query`)
@@ -176,14 +186,19 @@ const url = appendUtmParameters(url, params, {
 });
 ```
 
-#### `clearStoredUtmParameters(storageKey?, storageType?)`
+#### `clearStoredUtmParameters(options?)`
 
 Clear stored UTM parameters.
 
 ```typescript
 clearStoredUtmParameters();
-clearStoredUtmParameters('myapp_utm'); // Custom key
-clearStoredUtmParameters('utm_parameters', 'local'); // Clear from localStorage
+clearStoredUtmParameters({ storageKey: 'myapp_utm' });
+clearStoredUtmParameters({ storageType: 'local' });
+clearStoredUtmParameters({ onClear: () => console.log('Cleared!') });
+
+// Legacy positional args still work
+clearStoredUtmParameters('myapp_utm');
+clearStoredUtmParameters('utm_parameters', 'local');
 ```
 
 ### Key Conversion
@@ -299,6 +314,240 @@ const params = captureUtmParameters(url, {
 
 Built-in PII patterns detect: email addresses, international phone numbers, UK phone numbers, and US phone numbers.
 
+### Event Callbacks
+
+Hook into UTM lifecycle events for logging, analytics, or custom behavior.
+
+```typescript
+import {
+  captureUtmParameters,
+  storeUtmParameters,
+  getStoredUtmParameters,
+  clearStoredUtmParameters,
+  appendUtmParameters,
+} from '@jackmisner/utm-toolkit';
+
+// onCapture — fired after UTM params are captured from a URL
+captureUtmParameters(url, {
+  onCapture: (params) => console.log('Captured:', params),
+});
+
+// onStore — fired after params are written to storage
+storeUtmParameters(params, {
+  onStore: (params, meta) => console.log(`Stored (${meta.storageType}):`, params),
+});
+
+// onClear — fired when stored params are cleared
+clearStoredUtmParameters({
+  onClear: () => analytics.track('utm_params_cleared'),
+});
+
+// onAppend — fired after UTM params are appended to a URL
+appendUtmParameters(url, params, {
+  onAppend: (finalUrl, params) => console.log('Appended:', finalUrl),
+});
+
+// onExpire — fired when TTL-expired data is auto-cleaned
+getStoredUtmParameters({
+  storageType: 'local',
+  onExpire: (storageKey) => console.log(`Expired: ${storageKey}`),
+});
+```
+
+All callbacks are wrapped in try-catch — a throwing callback will never break the main pipeline.
+
+### First-Touch / Last-Touch Attribution
+
+Track how users first discovered your site vs. their most recent visit.
+
+```typescript
+import { storeWithAttribution, getAttributedParams } from '@jackmisner/utm-toolkit';
+
+// Mode: 'last' (default) — stores to main key, same as storeUtmParameters
+storeWithAttribution(params, {
+  attribution: { mode: 'last' },
+  storageKey: 'utm_parameters',
+  storageType: 'session',
+  keyFormat: 'snake_case',
+});
+
+// Mode: 'first' — write-once; only stores on the first visit
+storeWithAttribution(params, {
+  attribution: { mode: 'first' },
+  storageKey: 'utm_parameters',
+  storageType: 'session',
+  keyFormat: 'snake_case',
+});
+
+// Mode: 'both' — stores first-touch (write-once) and last-touch (always updates)
+storeWithAttribution(params, {
+  attribution: { mode: 'both', firstTouchSuffix: '_first', lastTouchSuffix: '_last' },
+  storageKey: 'utm_parameters',
+  storageType: 'session',
+  keyFormat: 'snake_case',
+});
+
+// Read attributed params
+const first = getAttributedParams({ ...opts, touch: 'first' });
+const last = getAttributedParams({ ...opts, touch: 'last' });
+```
+
+#### Attribution with React
+
+```tsx
+const {
+  utmParameters,       // Current params (based on attribution mode)
+  firstTouchParams,    // First-touch params (null when mode is 'last')
+  lastTouchParams,     // Last-touch params (null when mode is 'first')
+} = useUtmTracking({
+  config: { attribution: { mode: 'both' } },
+});
+```
+
+### UTM Link Builder
+
+Build UTM-tagged URLs from structured input with validation and warnings.
+
+```typescript
+import { buildUtmUrl, validateUtmValues } from '@jackmisner/utm-toolkit';
+
+const result = buildUtmUrl({
+  url: 'https://example.com',
+  source: 'google',
+  medium: 'cpc',
+  campaign: 'spring2025',
+});
+// result.valid === true
+// result.url === 'https://example.com?utm_source=google&utm_medium=cpc&utm_campaign=spring2025'
+// result.errors === []
+// result.warnings === []
+
+// With options
+const result = buildUtmUrl(
+  { url: 'example.com', source: 'Google', campaign: 'Spring' },
+  { normalize: true, lowercaseValues: true },
+);
+// Normalizes URL, lowercases all values, no uppercase warnings
+
+// Validation errors
+const result = buildUtmUrl({ url: 'https://example.com', source: 'goo&gle' });
+// result.valid === false
+// result.errors === ['source contains unsafe characters (& = ? #)']
+
+// Standalone validation
+const { errors, warnings } = validateUtmValues({ source: 'Google', medium: 'cpc' });
+// errors === [], warnings === ['source contains uppercase characters']
+```
+
+### Form Field Population
+
+Inject stored UTM params into HTML form fields. Works with vanilla JS or React.
+
+#### Vanilla JS
+
+```typescript
+import { populateFormFields, createUtmHiddenFields } from '@jackmisner/utm-toolkit';
+
+// Strategy: 'name' — find <input name="utm_source"> etc. and set values
+populateFormFields({ strategy: 'name' });
+
+// Strategy: 'data-attribute' — find <input data-utm="source"> etc.
+populateFormFields({ strategy: 'data-attribute' });
+
+// Strategy: 'auto-create' (default) — create hidden inputs in matching forms
+populateFormFields({ selector: '#signup-form' });
+
+// createUtmHiddenFields is a shortcut for auto-create strategy
+createUtmHiddenFields({ selector: 'form.track-utm' });
+```
+
+#### React
+
+```tsx
+import { UtmHiddenFields, useUtmFormData } from '@jackmisner/utm-toolkit/react';
+
+// Component — renders hidden <input> elements inside your form
+function ContactForm() {
+  return (
+    <form action="/submit">
+      <input name="email" type="email" />
+      <UtmHiddenFields prefix="tracking_" />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}
+
+// Hook — returns UTM data as a flat Record for form libraries
+function MyForm() {
+  const utmData = useUtmFormData();
+  // { utm_source: 'google', utm_medium: 'cpc', ... }
+
+  return (
+    <form>
+      {Object.entries(utmData).map(([key, value]) => (
+        <input key={key} type="hidden" name={key} value={value} />
+      ))}
+    </form>
+  );
+}
+```
+
+### Automatic Link Decoration
+
+Auto-append UTM params to links on a page. Useful for internal navigation tracking.
+
+#### Vanilla JS
+
+```typescript
+import { decorateLinks, observeAndDecorateLinks } from '@jackmisner/utm-toolkit';
+
+// Decorate all internal links
+decorateLinks();
+
+// With options
+decorateLinks({
+  selector: 'a.track',            // Custom CSS selector
+  internalOnly: true,              // Only same-host links (default)
+  includeHosts: ['partner.com'],   // Additional hosts to decorate
+  excludeHosts: ['cdn.example.com'], // Hosts to skip
+  skipExisting: true,              // Don't re-decorate (default)
+  extraParams: { utm_campaign: 'nav' }, // Additional static params
+  onAppend: (url, params) => console.log('Decorated:', url),
+});
+
+// For SPAs — watch for new links via MutationObserver
+const cleanup = observeAndDecorateLinks({ internalOnly: false });
+// Later: cleanup() to disconnect the observer
+```
+
+#### React
+
+```tsx
+import { UtmLinkDecorator, useUtmLinkDecorator } from '@jackmisner/utm-toolkit/react';
+
+// Component wrapper — decorates child links
+function Navigation() {
+  return (
+    <UtmLinkDecorator internalOnly={true}>
+      <nav>
+        <a href="/products">Products</a>
+        <a href="/pricing">Pricing</a>
+      </nav>
+    </UtmLinkDecorator>
+  );
+}
+
+// Hook — returns a ref to scope decoration to a container
+function MySection() {
+  const ref = useUtmLinkDecorator({ internalOnly: false });
+  return (
+    <div ref={ref}>
+      <a href="https://partner.com">Partner Link</a>
+    </div>
+  );
+}
+```
+
 ### Persistent Storage
 
 By default, UTM parameters are stored in `sessionStorage` (cleared when the tab closes). For longer-lived storage, use `localStorage` with an optional TTL.
@@ -357,18 +606,23 @@ import { useUtmTracking } from '@jackmisner/utm-toolkit/react';
 
 function MyComponent() {
   const {
-    utmParameters,    // Current captured params (or null)
-    isEnabled,        // Whether tracking is enabled
-    hasParams,        // Whether any params exist
-    capture,          // Manually capture from URL
-    clear,            // Clear stored params
-    appendToUrl,      // Append params to a URL
+    utmParameters,       // Current captured params (or null)
+    isEnabled,           // Whether tracking is enabled
+    hasParams,           // Whether any params exist
+    capture,             // Manually capture from URL
+    clear,               // Clear stored params
+    appendToUrl,         // Append params to a URL
+    firstTouchParams,    // First-touch params (null when attribution mode is 'last')
+    lastTouchParams,     // Last-touch params (null when attribution mode is 'first')
   } = useUtmTracking({
     config: {
       keyFormat: 'camelCase',
+      attribution: { mode: 'both' },
       shareContextParams: {
         linkedin: { utm_content: 'linkedin' },
       },
+      onCapture: (params) => analytics.track('utm_captured', params),
+      onStore: (params, meta) => analytics.track('utm_stored', { ...params, touch: meta.touch }),
     },
   });
 
@@ -415,6 +669,12 @@ installDebugHelpers();
 | `excludeFromShares` | `string[]` | `[]` | Params to exclude from shares |
 | `sanitize` | `SanitizeConfig` | `{ enabled: false }` | Value sanitization settings |
 | `piiFiltering` | `PiiFilterConfig` | `{ enabled: false }` | PII detection and filtering |
+| `attribution` | `AttributionConfig` | `{ mode: 'last' }` | First-touch/last-touch attribution |
+| `onCapture` | `function` | `undefined` | Callback after UTM params are captured |
+| `onStore` | `function` | `undefined` | Callback after UTM params are stored |
+| `onClear` | `function` | `undefined` | Callback when stored params are cleared |
+| `onAppend` | `function` | `undefined` | Callback after UTM params are appended to a URL |
+| `onExpire` | `function` | `undefined` | Callback when stored params expire (TTL) |
 
 ## TypeScript Types
 
@@ -423,10 +683,15 @@ import type {
   UtmParameters,
   UtmConfig,
   StorageType,
+  KeyFormat,
   SanitizeConfig,
   PiiFilterConfig,
   PiiPattern,
   SharePlatform,
+  AttributionMode,
+  AttributionConfig,
+  TouchType,
+  ValidationResult,
   UseUtmTrackingReturn,
 } from '@jackmisner/utm-toolkit';
 ```

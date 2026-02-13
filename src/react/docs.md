@@ -4,16 +4,17 @@ Path: @/src/react
 
 ### Overview
 
-- React integration layer providing a hook (`useUtmTracking`) and context provider (`UtmProvider`/`useUtmContext`) for UTM parameter management in React applications.
+- React integration layer providing hooks (`useUtmTracking`, `useUtmFormData`, `useUtmLinkDecorator`), a context provider (`UtmProvider`/`useUtmContext`), and components (`UtmHiddenFields`, `UtmLinkDecorator`) for UTM parameter management in React applications.
 - This is the second package entry point, imported as `@jackmisner/utm-toolkit/react` and built as a separate bundle with React externalized.
-- Orchestrates the core modules (`@/src/core`) and config system (`@/src/config`) into a stateful React API.
+- Orchestrates the inbound, outbound, and common modules along with the config system into stateful React APIs.
 
 ### How it fits into the larger codebase
 
-- `useUtmTracking` is the primary orchestrator: it calls `createConfig()` from `@/src/config`, then uses `captureUtmParameters`, `storeUtmParameters`, `getStoredUtmParameters`, `clearStoredUtmParameters`, `appendUtmParameters`, `convertParams`, and `isSnakeCaseUtmKey` from `@/src/core`. It forwards `storageType` and `ttl` from config to all storage operations.
+- `useUtmTracking` is the primary orchestrator: it calls `createConfig()` from `@/src/config`, then uses `captureUtmParameters` from `@/src/inbound/capture`, `storeUtmParameters`/`getStoredUtmParameters`/`clearStoredUtmParameters` from `@/src/common/storage`, `appendUtmParameters` from `@/src/outbound/appender`, and `convertParams`/`isSnakeCaseUtmKey` from `@/src/common/keys`. It forwards `storageType` and `ttl` from config to all storage operations.
+- `UtmHiddenFields` and `useUtmFormData` read stored params via `@/src/common/storage` to render form fields or return form-ready data.
+- `UtmLinkDecorator` and `useUtmLinkDecorator` use `decorateLinks` from `@/src/outbound/decorator` to auto-decorate anchor elements within a React component tree.
 - `UtmProvider` wraps `useUtmTracking` in a React context, enabling tree-wide access via `useUtmContext()`.
 - React is externalized in the build (`tsup.config.ts` declares `external: ['react']`) and declared as an optional peer dependency. The core library works without React.
-- Types (`UseUtmTrackingReturn`, `UtmProviderProps`, etc.) come from `@/src/types`.
 
 ### Core Implementation
 
@@ -45,15 +46,17 @@ URL with UTM params
 - Config is resolved once via `useRef(createConfig(options.config))` -- config changes after mount are not picked up.
 - The `hasInitialized` ref prevents double-capture in React strict mode or re-renders.
 - `appendToUrl` implements a layered merge: captured params are the base, then `shareContextParams.default` is applied, then `shareContextParams[platform]`. After merging, `excludeFromShares` filters out unwanted keys (comparing in both snake_case and camelCase).
-- `UtmProvider` memoizes the context value based on all return fields from `useUtmTracking` to prevent unnecessary re-renders of consumers.
-- `useUtmContext()` throws a descriptive error if called outside a `UtmProvider`, guiding the developer to either wrap with `<UtmProvider>` or use `useUtmTracking()` directly.
+- **Attribution in the hook**: `useUtmTracking` computes `firstTouchParams` and `lastTouchParams` based on `config.attribution.mode`. In `'last'` mode, `firstTouchParams` is null and `lastTouchParams` equals `utmParameters`. In `'first'` mode, it reads from the first-touch suffixed key. In `'both'` mode, both are read from their respective suffixed keys. These reads happen on every render (not memoized).
+- **`UtmHiddenFields`**: Renders `<input type="hidden">` elements for each stored UTM param. Reads directly from storage on each render. Supports an optional `prefix` for field names.
+- **`useUtmFormData`**: Returns a `Record<string, string>` of stored UTM params, memoized on `storageKey`, `storageType`, and `keyFormat`. Designed for integration with form libraries.
+- **`useUtmLinkDecorator`**: Returns a `ref` to attach to a container element. On mount, it scopes `decorateLinks()` to that container by temporarily setting a `data-utm-scope` attribute and using it as a CSS selector prefix.
 
 ### Things to Know
 
 - **Config is frozen at mount**: The `useRef` pattern means the resolved config never changes. If a consumer passes new config props, they will be ignored after the first render.
 - **Initialization guard**: `hasInitialized.current` is a ref (not state), so the guard works correctly across strict mode double-effects without triggering re-renders.
-- **`appendToUrl` exclusion logic**: The `excludeFromShares` filter converts camelCase keys to snake_case using inline regex (not the `toSnakeCase` utility), so it duplicates some conversion logic from `@/src/core/keys.ts`.
+- **`appendToUrl` exclusion logic**: The `excludeFromShares` filter converts camelCase keys to snake_case using inline regex (not the `toSnakeCase` utility), so it duplicates some conversion logic from `@/src/common/keys.ts`.
 - **Storage options forwarding**: The hook passes `storageType` and `ttl` from the resolved config to `storeUtmParameters`, `getStoredUtmParameters`, and `clearStoredUtmParameters`. The `clear` callback passes `storageType` so it clears the correct backend.
-- **SSR safety**: The `useState` initializer checks `typeof window === 'undefined'` and returns `null` for server rendering. The `capture` callback also checks before accessing `window.location`.
+- **SSR safety**: The `useState` initializer checks `typeof window === 'undefined'` and returns `null` for server rendering. The `capture` callback also checks before accessing `window.location`. Form and decorator components/hooks guard against `document` being undefined.
 
 Created and maintained by Nori.

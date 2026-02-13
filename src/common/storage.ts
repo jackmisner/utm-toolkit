@@ -29,6 +29,12 @@ export interface StorageOptions {
 
   /** TTL in milliseconds (only applies to localStorage, ignored for sessionStorage) */
   ttl?: number
+
+  /** Fired after UTM params are written to storage */
+  onStore?: (params: UtmParameters, meta: { storageType: StorageType }) => void
+
+  /** Fired when stored params expire (TTL) and are auto-cleaned */
+  onExpire?: (storageKey: string) => void
 }
 
 /**
@@ -174,6 +180,7 @@ export function storeUtmParameters(params: UtmParameters, options: StorageOption
     keyFormat = 'snake_case',
     storageType = 'session',
     ttl,
+    onStore,
   } = options
 
   const storage = getStorageBackend(storageType)
@@ -201,6 +208,14 @@ export function storeUtmParameters(params: UtmParameters, options: StorageOption
 
     const serialized = JSON.stringify(envelope)
     storage.setItem(storageKey, serialized)
+
+    if (onStore) {
+      try {
+        onStore(paramsToStore, { storageType })
+      } catch {
+        // Callbacks must not break the pipeline
+      }
+    }
   } catch (error) {
     if (typeof console !== 'undefined' && console.warn) {
       console.warn('Failed to store UTM parameters:', error)
@@ -220,7 +235,7 @@ export function storeUtmParameters(params: UtmParameters, options: StorageOption
  * @returns Stored UTM parameters or null if not found/invalid/expired
  */
 export function getStoredUtmParameters(options: StorageOptions = {}): UtmParameters | null {
-  const { storageKey = DEFAULT_STORAGE_KEY, keyFormat, storageType = 'session' } = options
+  const { storageKey = DEFAULT_STORAGE_KEY, keyFormat, storageType = 'session', onExpire } = options
 
   const storage = getStorageBackend(storageType)
   if (!storage) {
@@ -245,6 +260,13 @@ export function getStoredUtmParameters(options: StorageOptions = {}): UtmParamet
           storage.removeItem(storageKey)
         } catch {
           // Ignore cleanup errors
+        }
+        if (onExpire) {
+          try {
+            onExpire(storageKey)
+          } catch {
+            // Callbacks must not break the pipeline
+          }
         }
         return null
       }
@@ -284,15 +306,44 @@ export function getStoredUtmParameters(options: StorageOptions = {}): UtmParamet
 }
 
 /**
+ * Options for clearing stored UTM parameters
+ */
+export interface ClearOptions {
+  /** Storage key to clear (default: 'utm_parameters') */
+  storageKey?: string
+  /** Storage backend to clear from (default: 'session') */
+  storageType?: StorageType
+  /** Fired when stored params are cleared */
+  onClear?: () => void
+}
+
+/**
  * Removes stored UTM parameters from browser storage
  *
- * @param storageKey - Storage key to clear (default: 'utm_parameters')
- * @param storageType - Storage backend to clear from (default: 'session')
+ * @param options - Clear options including key, type, and callback
  */
+export function clearStoredUtmParameters(options?: ClearOptions): void
+/**
+ * @deprecated Use clearStoredUtmParameters(options) instead
+ */
+export function clearStoredUtmParameters(storageKey?: string, storageType?: StorageType): void
 export function clearStoredUtmParameters(
-  storageKey: string = DEFAULT_STORAGE_KEY,
-  storageType: StorageType = 'session',
+  storageKeyOrOptions?: string | ClearOptions,
+  storageTypeArg?: StorageType,
 ): void {
+  let storageKey = DEFAULT_STORAGE_KEY
+  let storageType: StorageType = 'session'
+  let onClear: (() => void) | undefined
+
+  if (typeof storageKeyOrOptions === 'object' && storageKeyOrOptions !== null) {
+    storageKey = storageKeyOrOptions.storageKey ?? DEFAULT_STORAGE_KEY
+    storageType = storageKeyOrOptions.storageType ?? 'session'
+    onClear = storageKeyOrOptions.onClear
+  } else {
+    storageKey = storageKeyOrOptions ?? DEFAULT_STORAGE_KEY
+    storageType = storageTypeArg ?? 'session'
+  }
+
   const storage = getStorageBackend(storageType)
   if (!storage) {
     return
@@ -300,6 +351,13 @@ export function clearStoredUtmParameters(
 
   try {
     storage.removeItem(storageKey)
+    if (onClear) {
+      try {
+        onClear()
+      } catch {
+        // Callbacks must not break the pipeline
+      }
+    }
   } catch (error) {
     if (typeof console !== 'undefined' && console.warn) {
       console.warn('Failed to clear UTM parameters:', error)

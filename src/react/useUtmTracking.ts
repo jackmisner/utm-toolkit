@@ -98,6 +98,7 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
       const stored = getStoredUtmParameters({
         storageKey: config.storageKey,
         keyFormat: config.keyFormat,
+        storageType: config.storageType,
       })
       return stored
     }
@@ -130,6 +131,8 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
       storeUtmParameters(params, {
         storageKey: config.storageKey,
         keyFormat: config.keyFormat,
+        storageType: config.storageType,
+        ttl: config.ttl,
       })
       setUtmParameters(params)
     } else if (checkHasParams(config.defaultParams)) {
@@ -138,6 +141,8 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
       storeUtmParameters(defaultParams, {
         storageKey: config.storageKey,
         keyFormat: config.keyFormat,
+        storageType: config.storageType,
+        ttl: config.ttl,
       })
       setUtmParameters(defaultParams)
     }
@@ -147,9 +152,9 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
    * Clear stored UTM parameters
    */
   const clear = useCallback(() => {
-    clearStoredUtmParameters(config.storageKey)
+    clearStoredUtmParameters(config.storageKey, config.storageType)
     setUtmParameters(null)
-  }, [config.storageKey])
+  }, [config.storageKey, config.storageType])
 
   /**
    * Append UTM parameters to a URL

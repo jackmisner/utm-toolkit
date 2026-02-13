@@ -76,8 +76,11 @@ export const DEFAULT_CONFIG: ResolvedUtmConfig = {
   /** Use snake_case format by default (matches URL query params) */
   keyFormat: 'snake_case',
 
-  /** Default storage key for sessionStorage */
+  /** Default storage key for browser storage */
   storageKey: 'utm_parameters',
+
+  /** Use sessionStorage by default (ephemeral, cleared on tab close) */
+  storageType: 'session',
 
   /** Auto-capture UTM params when React hook mounts */
   captureOnMount: true,

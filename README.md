@@ -9,7 +9,7 @@ A comprehensive TypeScript library for capturing, storing, and appending UTM tra
 - **Capture** UTM parameters from URLs
 - **Sanitize** parameter values to prevent XSS and injection
 - **PII filtering** to detect and reject/redact email addresses, phone numbers, and other PII
-- **Store** in sessionStorage for the browser session
+- **Store** in sessionStorage or localStorage (with optional TTL)
 - **Append** UTM parameters to share URLs
 - **Configurable** key format (snake_case or camelCase)
 - **Platform-specific** share context parameters
@@ -126,7 +126,7 @@ const params = captureUtmParameters(url, {
 
 #### `storeUtmParameters(params, options?)`
 
-Store UTM parameters in sessionStorage.
+Store UTM parameters in browser storage.
 
 ```typescript
 storeUtmParameters({ utm_source: 'linkedin', utm_campaign: 'sale' });
@@ -134,16 +134,25 @@ storeUtmParameters({ utm_source: 'linkedin', utm_campaign: 'sale' });
 // With custom storage key
 storeUtmParameters(params, { storageKey: 'myapp_utm' });
 
+// Store in localStorage (persists across sessions)
+storeUtmParameters(params, { storageType: 'local' });
+
+// Store in localStorage with 1-hour TTL
+storeUtmParameters(params, { storageType: 'local', ttl: 3600000 });
+
 // Store in camelCase format
 storeUtmParameters(params, { keyFormat: 'camelCase' });
 ```
 
 #### `getStoredUtmParameters(options?)`
 
-Retrieve stored UTM parameters.
+Retrieve stored UTM parameters. Returns null if data has expired (when TTL was set).
 
 ```typescript
 const params = getStoredUtmParameters();
+
+// Read from localStorage
+const params = getStoredUtmParameters({ storageType: 'local' });
 
 // With options
 const params = getStoredUtmParameters({
@@ -167,13 +176,14 @@ const url = appendUtmParameters(url, params, {
 });
 ```
 
-#### `clearStoredUtmParameters(storageKey?)`
+#### `clearStoredUtmParameters(storageKey?, storageType?)`
 
 Clear stored UTM parameters.
 
 ```typescript
 clearStoredUtmParameters();
 clearStoredUtmParameters('myapp_utm'); // Custom key
+clearStoredUtmParameters('utm_parameters', 'local'); // Clear from localStorage
 ```
 
 ### Key Conversion
@@ -289,6 +299,34 @@ const params = captureUtmParameters(url, {
 
 Built-in PII patterns detect: email addresses, international phone numbers, UK phone numbers, and US phone numbers.
 
+### Persistent Storage
+
+By default, UTM parameters are stored in `sessionStorage` (cleared when the tab closes). For longer-lived storage, use `localStorage` with an optional TTL.
+
+```typescript
+import { storeUtmParameters, getStoredUtmParameters, createConfig } from '@jackmisner/utm-toolkit';
+
+// Ephemeral storage (default) — cleared when tab closes
+storeUtmParameters(params);
+
+// Persistent storage — survives browser restarts
+storeUtmParameters(params, { storageType: 'local' });
+
+// Persistent storage with 24-hour TTL — auto-expires
+storeUtmParameters(params, { storageType: 'local', ttl: 86400000 });
+
+// Expired data returns null and is auto-cleaned from storage
+const stored = getStoredUtmParameters({ storageType: 'local' });
+
+// Use with React hook
+const { utmParameters } = useUtmTracking({
+  config: {
+    storageType: 'local',
+    ttl: 86400000, // 24 hours
+  },
+});
+```
+
 ### Configuration
 
 ```typescript
@@ -298,6 +336,7 @@ const config = createConfig({
   enabled: true,
   keyFormat: 'snake_case',
   storageKey: 'utm_parameters',
+  storageType: 'session',
   captureOnMount: true,
   appendToShares: true,
   allowedParameters: ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id'],
@@ -365,7 +404,9 @@ installDebugHelpers();
 |--------|------|---------|-------------|
 | `enabled` | `boolean` | `true` | Enable/disable UTM tracking |
 | `keyFormat` | `'snake_case' \| 'camelCase'` | `'snake_case'` | Key format for returned params |
-| `storageKey` | `string` | `'utm_parameters'` | sessionStorage key |
+| `storageKey` | `string` | `'utm_parameters'` | Browser storage key |
+| `storageType` | `'session' \| 'local'` | `'session'` | Storage backend (sessionStorage or localStorage) |
+| `ttl` | `number` | `undefined` | Time-to-live in ms for stored params (localStorage only) |
 | `captureOnMount` | `boolean` | `true` | Auto-capture on React hook mount |
 | `appendToShares` | `boolean` | `true` | Append UTM params to share URLs |
 | `allowedParameters` | `string[]` | Standard UTM params | Params to capture |
@@ -381,6 +422,7 @@ installDebugHelpers();
 import type {
   UtmParameters,
   UtmConfig,
+  StorageType,
   SanitizeConfig,
   PiiFilterConfig,
   PiiPattern,
@@ -392,7 +434,7 @@ import type {
 ## Browser Support
 
 - All modern browsers (Chrome, Firefox, Safari, Edge)
-- Requires `sessionStorage` support
+- Requires `sessionStorage` or `localStorage` support
 - SSR-safe (returns empty/null values on server)
 
 ## Migration from Existing Projects

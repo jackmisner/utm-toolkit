@@ -32,17 +32,17 @@ Consumer API
 
 - **types/** (`@/src/types`): Shared type definitions consumed by all other modules. Defines the dual key format system (snake_case/camelCase) and configuration interfaces.
 - **config/** (`@/src/config`): Pure configuration creation and validation. Merges partial user config with defaults to produce `ResolvedUtmConfig`.
-- **core/** (`@/src/core`): Framework-agnostic UTM operations -- capture from URLs, sanitize parameter values, filter PII, persist in sessionStorage, append to outbound URLs, convert key formats, validate URLs. All SSR-safe.
+- **core/** (`@/src/core`): Framework-agnostic UTM operations -- capture from URLs, sanitize parameter values, filter PII, persist in sessionStorage or localStorage (with optional TTL), append to outbound URLs, convert key formats, validate URLs. All SSR-safe.
 - **debug/** (`@/src/debug`): Development-time diagnostics. Assembles state snapshots and provides formatted console output and optional `window.utmDebug` helpers.
 - **react/** (`@/src/react`): React hook and context provider that orchestrate the core modules into stateful React APIs with auto-capture-on-mount behavior.
 
-**Key data flow**: URL with UTM params --> `capture` (with optional sanitization and PII filtering) --> `store` in sessionStorage --> `appendToUrl` for outbound link generation.
+**Key data flow**: URL with UTM params --> `capture` (with optional sanitization and PII filtering) --> `store` in sessionStorage or localStorage (with optional TTL) --> `appendToUrl` for outbound link generation.
 
 ### Things to Know
 
 - **Dual key format invariant**: The library supports both `snake_case` (URL convention) and `camelCase` (TypeScript convention) throughout, but all URL-facing operations always convert to snake_case internally. This is enforced in `@/src/core/appender.ts`.
 - **SSR safety**: Every module that touches browser APIs (`window`, `sessionStorage`, `URL`, `document`) guards against their absence. The library can be imported and initialized on the server without errors.
 - **Two entry points**: The package.json `exports` map defines separate conditional exports for `.` and `./react`, each with ESM/CJS/types variants. React is externalized in the build so it is not bundled into the output.
-- **No runtime dependencies**: The library is self-contained. All functionality is implemented from scratch using standard Web APIs (`URL`, `URLSearchParams`, `sessionStorage`).
+- **No runtime dependencies**: The library is self-contained. All functionality is implemented from scratch using standard Web APIs (`URL`, `URLSearchParams`, `sessionStorage`, `localStorage`).
 
 Created and maintained by Nori.

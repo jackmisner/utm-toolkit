@@ -114,6 +114,8 @@ export function createConfig(userConfig?: Partial<UtmConfig>): ResolvedUtmConfig
     enabled: userConfig.enabled ?? defaults.enabled,
     keyFormat: userConfig.keyFormat ?? defaults.keyFormat,
     storageKey: userConfig.storageKey ?? defaults.storageKey,
+    storageType: userConfig.storageType ?? defaults.storageType,
+    ttl: userConfig.ttl ?? defaults.ttl,
     captureOnMount: userConfig.captureOnMount ?? defaults.captureOnMount,
     appendToShares: userConfig.appendToShares ?? defaults.appendToShares,
     allowedParameters: userConfig.allowedParameters
@@ -147,6 +149,8 @@ export function mergeConfig(
     enabled: override.enabled ?? base.enabled,
     keyFormat: override.keyFormat ?? base.keyFormat,
     storageKey: override.storageKey ?? base.storageKey,
+    storageType: override.storageType ?? base.storageType,
+    ttl: override.ttl ?? base.ttl,
     captureOnMount: override.captureOnMount ?? base.captureOnMount,
     appendToShares: override.appendToShares ?? base.appendToShares,
     allowedParameters: override.allowedParameters
@@ -223,6 +227,14 @@ export function validateConfig(config: unknown): string[] {
 
   if (c.storageKey !== undefined && typeof c.storageKey !== 'string') {
     errors.push('storageKey must be a string')
+  }
+
+  if (c.storageType !== undefined && c.storageType !== 'session' && c.storageType !== 'local') {
+    errors.push('storageType must be "session" or "local"')
+  }
+
+  if (c.ttl !== undefined && (typeof c.ttl !== 'number' || !Number.isFinite(c.ttl) || c.ttl <= 0)) {
+    errors.push('ttl must be a positive finite number')
   }
 
   if (c.captureOnMount !== undefined && typeof c.captureOnMount !== 'boolean') {

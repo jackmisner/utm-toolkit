@@ -437,6 +437,61 @@ describe('piiFiltering config', () => {
   })
 })
 
+describe('storageType and ttl config', () => {
+  it('createConfig defaults storageType to session', () => {
+    const config = createConfig()
+    expect(config.storageType).toBe('session')
+  })
+
+  it('createConfig defaults ttl to undefined', () => {
+    const config = createConfig()
+    expect(config.ttl).toBeUndefined()
+  })
+
+  it('createConfig accepts storageType override', () => {
+    const config = createConfig({ storageType: 'local' })
+    expect(config.storageType).toBe('local')
+  })
+
+  it('createConfig accepts ttl override', () => {
+    const config = createConfig({ storageType: 'local', ttl: 3600000 })
+    expect(config.ttl).toBe(3600000)
+  })
+
+  it('mergeConfig merges storageType', () => {
+    const base = createConfig()
+    const merged = mergeConfig(base, { storageType: 'local' })
+    expect(merged.storageType).toBe('local')
+  })
+
+  it('mergeConfig merges ttl', () => {
+    const base = createConfig()
+    const merged = mergeConfig(base, { ttl: 60000 })
+    expect(merged.ttl).toBe(60000)
+  })
+
+  it('validateConfig validates storageType is session or local', () => {
+    const errors = validateConfig({ storageType: 'indexeddb' })
+    expect(errors).toContain('storageType must be "session" or "local"')
+  })
+
+  it('validateConfig accepts valid storageType values', () => {
+    expect(validateConfig({ storageType: 'session' })).toEqual([])
+    expect(validateConfig({ storageType: 'local' })).toEqual([])
+  })
+
+  it('validateConfig validates ttl is a positive finite number', () => {
+    expect(validateConfig({ ttl: -1 })).toContain('ttl must be a positive finite number')
+    expect(validateConfig({ ttl: 'string' })).toContain('ttl must be a positive finite number')
+    expect(validateConfig({ ttl: NaN })).toContain('ttl must be a positive finite number')
+    expect(validateConfig({ ttl: Infinity })).toContain('ttl must be a positive finite number')
+  })
+
+  it('validateConfig accepts valid ttl', () => {
+    expect(validateConfig({ ttl: 3600000 })).toEqual([])
+  })
+})
+
 describe('getDefaultConfig', () => {
   it('returns a copy of default config', () => {
     const config1 = getDefaultConfig()

@@ -20,7 +20,9 @@ export {
   getStoredUtmParameters,
   clearStoredUtmParameters,
   hasStoredUtmParameters,
+  isStorageAvailable,
   isSessionStorageAvailable,
+  isLocalStorageAvailable,
   getRawStoredValue,
   DEFAULT_STORAGE_KEY,
   type StorageOptions,
@@ -90,6 +92,7 @@ export { getDiagnostics, debugUtmState, checkUtmTracking, installDebugHelpers } 
 // Types
 export type {
   KeyFormat,
+  StorageType,
   SnakeCaseUtmKey,
   StandardSnakeCaseUtmKey,
   StandardCamelCaseUtmKey,

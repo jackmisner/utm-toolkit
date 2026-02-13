@@ -10,7 +10,6 @@ coverage/
 
 # Config files
 tsconfig.json
-tsconfig.cjs.json
 .gitignore
 .prettierrc
 .eslintrc*

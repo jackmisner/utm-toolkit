@@ -164,9 +164,7 @@ export function checkUtmTracking(config?: ResolvedUtmConfig): string[] {
 /**
  * Install debug helpers on the window object for browser console access
  *
- * Only installs if running in a browser and either:
- * - In development mode (import.meta.env.DEV)
- * - URL contains ?debug_utm=true
+ * Only installs if running in a browser and URL contains ?debug_utm=true
  *
  * @example
  * ```typescript

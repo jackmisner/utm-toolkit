@@ -7,7 +7,7 @@
 
 import type { KeyFormat, PiiFilterConfig, SanitizeConfig, UtmParameters } from '../types'
 import { DEFAULT_PII_FILTER_CONFIG, DEFAULT_SANITIZE_CONFIG } from '../config/defaults'
-import { convertParams, isSnakeCaseUtmKey } from './keys'
+import { convertParams, isSnakeCaseUtmKey } from '../common/keys'
 import { filterParams } from './pii-filter'
 import { sanitizeParams } from './sanitizer'
 
@@ -26,6 +26,9 @@ export interface CaptureOptions {
 
   /** PII filtering configuration — when enabled, detects and filters PII from values */
   piiFiltering?: Partial<PiiFilterConfig>
+
+  /** Fired after UTM params are captured from a URL */
+  onCapture?: (params: UtmParameters) => void
 }
 
 /**
@@ -68,7 +71,7 @@ function isBrowser(): boolean {
  * ```
  */
 export function captureUtmParameters(url?: string, options: CaptureOptions = {}): UtmParameters {
-  const { keyFormat = 'snake_case', allowedParameters, sanitize, piiFiltering } = options
+  const { keyFormat = 'snake_case', allowedParameters, sanitize, piiFiltering, onCapture } = options
 
   // Get URL, defaulting to current page URL in browser
   const urlString = url ?? (isBrowser() ? window.location.href : '')
@@ -115,11 +118,18 @@ export function captureUtmParameters(url?: string, options: CaptureOptions = {})
       : sanitized
 
     // Convert to target format if needed
-    if (keyFormat === 'camelCase') {
-      return convertParams(captured, 'camelCase')
+    const result = keyFormat === 'camelCase' ? convertParams(captured, 'camelCase') : captured
+
+    // Fire onCapture callback if params were found
+    if (onCapture && Object.keys(result).length > 0) {
+      try {
+        onCapture(result)
+      } catch {
+        // Callbacks must not break the pipeline
+      }
     }
 
-    return captured
+    return result
   } catch (error) {
     // If URL parsing fails, return empty object
     // This ensures the function is robust and doesn't break the app

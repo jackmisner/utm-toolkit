@@ -13,14 +13,14 @@ import type {
   SharePlatform,
   UseUtmTrackingReturn,
 } from '../types'
-import { captureUtmParameters, hasUtmParameters as checkHasParams } from '../core/capture'
+import { captureUtmParameters, hasUtmParameters as checkHasParams } from '../inbound/capture'
 import {
   storeUtmParameters,
   getStoredUtmParameters,
   clearStoredUtmParameters,
-} from '../core/storage'
-import { appendUtmParameters } from '../core/appender'
-import { convertParams, isSnakeCaseUtmKey } from '../core/keys'
+} from '../common/storage'
+import { appendUtmParameters } from '../outbound/appender'
+import { convertParams, isSnakeCaseUtmKey } from '../common/keys'
 import { createConfig } from '../config/loader'
 
 /**
@@ -232,6 +232,27 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
   // Compute hasParams
   const hasParams = checkHasParams(utmParameters)
 
+  // Attribution mode determines which touch params are available
+  const attributionMode = config.attribution?.mode ?? 'last'
+  const firstTouchParams =
+    attributionMode === 'last'
+      ? null
+      : getStoredUtmParameters({
+          storageKey: config.storageKey + (config.attribution?.firstTouchSuffix ?? '_first'),
+          keyFormat: config.keyFormat,
+          storageType: config.storageType,
+        })
+  const lastTouchParams =
+    attributionMode === 'first'
+      ? null
+      : attributionMode === 'both'
+        ? getStoredUtmParameters({
+            storageKey: config.storageKey + (config.attribution?.lastTouchSuffix ?? '_last'),
+            keyFormat: config.keyFormat,
+            storageType: config.storageType,
+          })
+        : utmParameters
+
   return {
     utmParameters,
     isEnabled,
@@ -239,5 +260,7 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
     capture,
     clear,
     appendToUrl,
+    firstTouchParams,
+    lastTouchParams,
   }
 }

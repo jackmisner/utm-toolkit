@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { detectPii, filterValue, filterParams } from '../../src/core/pii-filter'
+import { detectPii, filterValue, filterParams } from '../../src/inbound/pii-filter'
 import type { PiiFilterConfig, PiiPattern } from '../../src/types'
 
 const defaultPatterns: PiiPattern[] = [

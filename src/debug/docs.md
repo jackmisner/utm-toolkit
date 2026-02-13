@@ -10,17 +10,17 @@ Path: @/src/debug
 
 ### How it fits into the larger codebase
 
-- Imports `captureUtmParameters` from `@/src/core/capture`, `getStoredUtmParameters`/`isStorageAvailable`/`getRawStoredValue` from `@/src/core/storage`, and `getDefaultConfig` from `@/src/config/defaults`.
+- Imports `captureUtmParameters` from `@/src/inbound/capture`, `getStoredUtmParameters`/`isStorageAvailable`/`getRawStoredValue` from `@/src/common/storage`, and `getDefaultConfig` from `@/src/config/defaults`.
 - Re-exported through `@/src/index.ts` so consumers can call these functions directly.
-- Does not depend on or interact with `@/src/react` -- it operates on the core layer only.
+- Does not depend on or interact with `@/src/react` -- it operates on the inbound/common layers only.
 - All functions accept an optional `ResolvedUtmConfig`; when omitted, they fall back to `getDefaultConfig()`.
 
 ### Core Implementation
 
 - `getDiagnostics()` assembles a `DiagnosticInfo` snapshot: resolves config, captures URL params via `captureUtmParameters`, reads stored params via `getStoredUtmParameters` (passing `storageType` from config), and checks `isStorageAvailable(config.storageType)`. SSR-safe (returns empty URL and empty params when `window` is unavailable).
-- `debugUtmState()` calls `getDiagnostics()` and formats output using `console.group`/`console.table` for structured browser console display.
-- `checkUtmTracking()` calls `getDiagnostics()` and returns an array of status strings with emoji prefixes indicating state (e.g., whether params are in the URL, in storage, or if there is a mismatch suggesting the hook has not initialized yet). The storage-unavailable warning message dynamically uses `localStorage` or `sessionStorage` based on `config.storageType`.
-- `installDebugHelpers()` checks for `?debug_utm=true` in the URL query string. If present, it attaches a `window.utmDebug` object with `state()`, `check()`, `diagnostics()`, and `raw()` methods. Only activates in browser environments.
+- `debugUtmState()` calls `getDiagnostics()` and formats output using `console.group`/`console.table`. Logs `storageType` alongside key format and storage key.
+- `checkUtmTracking()` calls `getDiagnostics()` and returns an array of status strings with emoji prefixes indicating state. The storage-unavailable warning message dynamically uses `localStorage` or `sessionStorage` based on `config.storageType`.
+- `installDebugHelpers()` checks for `?debug_utm=true` in the URL query string. If present, it attaches a `window.utmDebug` object with `state()`, `check()`, `diagnostics()`, and `raw()` methods. The `raw()` helper reads from the correct storage backend based on `config.storageType`.
 
 ### Things to Know
 

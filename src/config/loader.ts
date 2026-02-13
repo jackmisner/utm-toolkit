@@ -5,6 +5,7 @@
  */
 
 import type {
+  AttributionConfig,
   UtmConfig,
   ResolvedUtmConfig,
   PiiFilterConfig,
@@ -131,6 +132,29 @@ export function createConfig(userConfig?: Partial<UtmConfig>): ResolvedUtmConfig
       : defaults.excludeFromShares,
     sanitize: mergeSanitizeConfig(defaults.sanitize, userConfig.sanitize),
     piiFiltering: mergePiiFilterConfig(defaults.piiFiltering, userConfig.piiFiltering),
+    attribution: mergeAttributionConfig(defaults.attribution, userConfig.attribution),
+    onCapture: userConfig.onCapture,
+    onStore: userConfig.onStore,
+    onClear: userConfig.onClear,
+    onAppend: userConfig.onAppend,
+    onExpire: userConfig.onExpire,
+  }
+}
+
+/**
+ * Merge attribution config with defaults
+ */
+function mergeAttributionConfig(
+  base: AttributionConfig,
+  override: Partial<AttributionConfig> | undefined,
+): AttributionConfig {
+  if (!override) {
+    return { ...base }
+  }
+  return {
+    mode: override.mode ?? base.mode,
+    firstTouchSuffix: override.firstTouchSuffix ?? base.firstTouchSuffix,
+    lastTouchSuffix: override.lastTouchSuffix ?? base.lastTouchSuffix,
   }
 }
 
@@ -166,6 +190,12 @@ export function mergeConfig(
       : [...base.excludeFromShares],
     sanitize: mergeSanitizeConfig(base.sanitize, override.sanitize),
     piiFiltering: mergePiiFilterConfig(base.piiFiltering, override.piiFiltering),
+    attribution: mergeAttributionConfig(base.attribution, override.attribution),
+    onCapture: override.onCapture ?? base.onCapture,
+    onStore: override.onStore ?? base.onStore,
+    onClear: override.onClear ?? base.onClear,
+    onAppend: override.onAppend ?? base.onAppend,
+    onExpire: override.onExpire ?? base.onExpire,
   }
 }
 

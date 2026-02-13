@@ -6,7 +6,7 @@
  * @packageDocumentation
  */
 
-// Core utilities (framework-agnostic)
+// Inbound utilities (capture, sanitize, filter)
 export {
   // Capture
   captureUtmParameters,
@@ -15,6 +15,49 @@ export {
   captureWithReferrer,
   type CaptureOptions,
 
+  // Sanitizer
+  sanitizeValue,
+  sanitizeParams,
+
+  // PII Filter
+  detectPii,
+  filterValue,
+  filterParams,
+
+  // Form field population
+  populateFormFields,
+  createUtmHiddenFields,
+  type FormPopulateOptions,
+
+  // Attribution
+  storeWithAttribution,
+  getAttributedParams,
+  type AttributionStoreOptions,
+  type AttributionGetOptions,
+} from './inbound'
+
+// Outbound utilities (append)
+export {
+  // Appender
+  appendUtmParameters,
+  removeUtmParameters,
+  extractUtmParameters,
+
+  // Builder
+  buildUtmUrl,
+  validateUtmValues,
+  type BuildUtmUrlParams,
+  type BuildUtmUrlOptions,
+  type BuildResult,
+
+  // Link decorator
+  decorateLinks,
+  observeAndDecorateLinks,
+  type LinkDecoratorOptions,
+} from './outbound'
+
+// Common utilities (storage, keys, validator)
+export {
   // Storage
   storeUtmParameters,
   getStoredUtmParameters,
@@ -26,11 +69,7 @@ export {
   getRawStoredValue,
   DEFAULT_STORAGE_KEY,
   type StorageOptions,
-
-  // Appender
-  appendUtmParameters,
-  removeUtmParameters,
-  extractUtmParameters,
+  type ClearOptions,
 
   // Keys
   toSnakeCase,
@@ -50,15 +89,6 @@ export {
   STANDARD_SNAKE_KEYS,
   STANDARD_CAMEL_KEYS,
 
-  // Sanitizer
-  sanitizeValue,
-  sanitizeParams,
-
-  // PII Filter
-  detectPii,
-  filterValue,
-  filterParams,
-
   // Validator
   validateUrl,
   normalizeUrl,
@@ -70,7 +100,7 @@ export {
   isProtocolAllowed,
   getErrorMessage,
   ERROR_MESSAGES,
-} from './core'
+} from './common'
 
 // Configuration
 export {
@@ -78,6 +108,7 @@ export {
   DEFAULT_SANITIZE_CONFIG,
   DEFAULT_PII_PATTERNS,
   DEFAULT_PII_FILTER_CONFIG,
+  DEFAULT_ATTRIBUTION_CONFIG,
   STANDARD_UTM_PARAMETERS,
   getDefaultConfig,
   createConfig,
@@ -112,4 +143,7 @@ export type {
   SanitizeConfig,
   PiiPattern,
   PiiFilterConfig,
+  AttributionMode,
+  TouchType,
+  AttributionConfig,
 } from './types'

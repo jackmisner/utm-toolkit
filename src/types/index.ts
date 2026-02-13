@@ -13,6 +13,31 @@ export type KeyFormat = 'snake_case' | 'camelCase'
 export type StorageType = 'session' | 'local'
 
 /**
+ * Attribution mode for UTM parameter storage
+ * - 'last': Only store last-touch (current behavior, default)
+ * - 'first': Only store first-touch (write-once)
+ * - 'both': Store both first-touch and last-touch
+ */
+export type AttributionMode = 'last' | 'first' | 'both'
+
+/**
+ * Touch type for reading attributed params
+ */
+export type TouchType = 'first' | 'last'
+
+/**
+ * Configuration for attribution behavior
+ */
+export interface AttributionConfig {
+  /** Attribution mode (default: 'last') */
+  mode: AttributionMode
+  /** Storage key suffix for first-touch (default: '_first') */
+  firstTouchSuffix?: string
+  /** Storage key suffix for last-touch (default: '_last') */
+  lastTouchSuffix?: string
+}
+
+/**
  * Standard UTM parameter keys in snake_case (URL format)
  */
 export type StandardSnakeCaseUtmKey =
@@ -92,6 +117,8 @@ export interface AppendOptions {
   toFragment?: boolean
   /** Keep existing UTM parameters instead of replacing them */
   preserveExisting?: boolean
+  /** Fired after UTM params are appended to a URL */
+  onAppend?: (url: string, params: UtmParameters) => void
 }
 
 /**
@@ -217,6 +244,23 @@ export interface UtmConfig {
 
   /** PII filtering configuration */
   piiFiltering?: Partial<PiiFilterConfig>
+
+  /** Attribution configuration (first-touch / last-touch) */
+  attribution?: Partial<AttributionConfig>
+
+  /** Fired after UTM params are captured from a URL */
+  onCapture?: (params: UtmParameters) => void
+  /** Fired after UTM params are written to storage */
+  onStore?: (
+    params: UtmParameters,
+    meta: { storageType: StorageType; touch?: 'first' | 'last' },
+  ) => void
+  /** Fired when stored params are cleared */
+  onClear?: () => void
+  /** Fired after UTM params are appended to a URL */
+  onAppend?: (url: string, params: UtmParameters) => void
+  /** Fired when stored params expire (TTL) and are auto-cleaned */
+  onExpire?: (storageKey: string) => void
 }
 
 /**
@@ -236,6 +280,15 @@ export interface ResolvedUtmConfig {
   excludeFromShares: string[]
   sanitize: SanitizeConfig
   piiFiltering: PiiFilterConfig
+  attribution: AttributionConfig
+  onCapture?: (params: UtmParameters) => void
+  onStore?: (
+    params: UtmParameters,
+    meta: { storageType: StorageType; touch?: 'first' | 'last' },
+  ) => void
+  onClear?: () => void
+  onAppend?: (url: string, params: UtmParameters) => void
+  onExpire?: (storageKey: string) => void
 }
 
 /**
@@ -264,6 +317,11 @@ export interface UseUtmTrackingReturn {
    * @returns URL with UTM parameters appended
    */
   appendToUrl: (url: string, platform?: SharePlatform) => string
+
+  /** First-touch UTM parameters (null when attribution mode is 'last') */
+  firstTouchParams: UtmParameters | null
+  /** Last-touch UTM parameters (null when attribution mode is 'first') */
+  lastTouchParams: UtmParameters | null
 }
 
 /**

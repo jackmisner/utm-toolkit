@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sanitizeValue, sanitizeParams } from '../../src/core/sanitizer'
+import { sanitizeValue, sanitizeParams } from '../../src/inbound/sanitizer'
 import type { SanitizeConfig } from '../../src/types'
 
 const defaultConfig: SanitizeConfig = {

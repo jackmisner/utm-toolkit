@@ -4,7 +4,7 @@
  * Provides sensible defaults for UTM toolkit configuration.
  */
 
-import type { ResolvedUtmConfig, SanitizeConfig } from '../types'
+import type { PiiFilterConfig, PiiPattern, ResolvedUtmConfig, SanitizeConfig } from '../types'
 
 /**
  * Default sanitization configuration
@@ -15,6 +15,42 @@ export const DEFAULT_SANITIZE_CONFIG: SanitizeConfig = {
   stripHtml: true,
   stripControlChars: true,
   maxLength: 200,
+}
+
+/**
+ * Built-in PII detection patterns
+ */
+export const DEFAULT_PII_PATTERNS: PiiPattern[] = [
+  {
+    name: 'email',
+    pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/,
+    enabled: true,
+  },
+  {
+    name: 'phone_international',
+    pattern: /\+\d{10,15}\b/,
+    enabled: true,
+  },
+  {
+    name: 'phone_uk',
+    pattern: /\b(?:0|\+44)\d{9,10}\b/,
+    enabled: true,
+  },
+  {
+    name: 'phone_us',
+    pattern: /\b\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/,
+    enabled: true,
+  },
+]
+
+/**
+ * Default PII filtering configuration
+ * PII filtering is disabled by default but has sensible defaults when enabled
+ */
+export const DEFAULT_PII_FILTER_CONFIG: PiiFilterConfig = {
+  enabled: false,
+  mode: 'reject',
+  patterns: [...DEFAULT_PII_PATTERNS],
 }
 
 /**
@@ -63,6 +99,9 @@ export const DEFAULT_CONFIG: ResolvedUtmConfig = {
 
   /** Sanitization disabled by default */
   sanitize: { ...DEFAULT_SANITIZE_CONFIG },
+
+  /** PII filtering disabled by default (deep copy to prevent shared references) */
+  piiFiltering: { ...DEFAULT_PII_FILTER_CONFIG, patterns: [...DEFAULT_PII_PATTERNS] },
 }
 
 /**
@@ -77,5 +116,9 @@ export function getDefaultConfig(): ResolvedUtmConfig {
     shareContextParams: { ...DEFAULT_CONFIG.shareContextParams },
     excludeFromShares: [...DEFAULT_CONFIG.excludeFromShares],
     sanitize: { ...DEFAULT_CONFIG.sanitize },
+    piiFiltering: {
+      ...DEFAULT_CONFIG.piiFiltering,
+      patterns: DEFAULT_CONFIG.piiFiltering.patterns.map((p) => ({ ...p })),
+    },
   }
 }

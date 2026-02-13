@@ -125,6 +125,47 @@ export interface SanitizeConfig {
 }
 
 /**
+ * A named PII detection pattern
+ */
+export interface PiiPattern {
+  /** Identifier for this pattern (e.g. 'email', 'phone_us') */
+  name: string
+
+  /** Regex to detect PII in a value */
+  pattern: RegExp
+
+  /** Whether this pattern is active */
+  enabled: boolean
+}
+
+/**
+ * Configuration for PII filtering
+ */
+export interface PiiFilterConfig {
+  /** Enable PII filtering (default: false) */
+  enabled: boolean
+
+  /** How to handle detected PII: 'reject' discards the value, 'redact' replaces it with [REDACTED] */
+  mode: 'reject' | 'redact'
+
+  /** PII detection patterns (default: built-in email + phone patterns) */
+  patterns: PiiPattern[]
+
+  /** Optional strict allowlist — values must match this pattern to be accepted (takes precedence over PII patterns) */
+  allowlistPattern?: RegExp
+
+  /**
+   * Optional callback fired when PII is detected.
+   *
+   * WARNING: The `value` parameter contains the raw detected PII.
+   * Do NOT log or transmit this value to analytics services,
+   * as that would defeat the purpose of PII filtering.
+   * This callback is intended for counting/alerting only.
+   */
+  onPiiDetected?: (param: string, value: string, patternName: string) => void
+}
+
+/**
  * Main configuration interface for UTM toolkit
  */
 export interface UtmConfig {
@@ -160,6 +201,9 @@ export interface UtmConfig {
 
   /** Value sanitization configuration */
   sanitize?: Partial<SanitizeConfig>
+
+  /** PII filtering configuration */
+  piiFiltering?: Partial<PiiFilterConfig>
 }
 
 /**
@@ -176,6 +220,7 @@ export interface ResolvedUtmConfig {
   shareContextParams: ShareContextParams
   excludeFromShares: string[]
   sanitize: SanitizeConfig
+  piiFiltering: PiiFilterConfig
 }
 
 /**

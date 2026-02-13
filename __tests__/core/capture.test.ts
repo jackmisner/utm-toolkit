@@ -230,6 +230,62 @@ describe('sanitization integration', () => {
   })
 })
 
+describe('PII filtering integration', () => {
+  const piiFilterConfig = {
+    enabled: true,
+    mode: 'reject' as const,
+    patterns: [
+      {
+        name: 'email',
+        pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/,
+        enabled: true,
+      },
+    ],
+  }
+
+  it('rejects PII values when piiFiltering is enabled', () => {
+    const result = captureUtmParameters(
+      'https://example.com?utm_source=john@example.com&utm_medium=email',
+      { piiFiltering: piiFilterConfig },
+    )
+    expect(result).not.toHaveProperty('utm_source')
+    expect(result.utm_medium).toBe('email')
+  })
+
+  it('does not filter when piiFiltering is not provided', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=john@example.com')
+    expect(result.utm_source).toBe('john@example.com')
+  })
+
+  it('does not filter when piiFiltering.enabled is false', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=john@example.com', {
+      piiFiltering: { ...piiFilterConfig, enabled: false },
+    })
+    expect(result.utm_source).toBe('john@example.com')
+  })
+
+  it('works with camelCase key format', () => {
+    const result = captureUtmParameters(
+      'https://example.com?utm_source=john@example.com&utm_medium=cpc',
+      { keyFormat: 'camelCase', piiFiltering: piiFilterConfig },
+    )
+    expect(result).not.toHaveProperty('utmSource')
+    expect(result.utmMedium).toBe('cpc')
+  })
+
+  it('applies PII filter after sanitization', () => {
+    const result = captureUtmParameters(
+      'https://example.com?utm_source=john@example.com&utm_campaign=spring-2025',
+      {
+        sanitize: { enabled: true },
+        piiFiltering: piiFilterConfig,
+      },
+    )
+    expect(result).not.toHaveProperty('utm_source')
+    expect(result.utm_campaign).toBe('spring-2025')
+  })
+})
+
 describe('captureFromCurrentUrl', () => {
   beforeEach(() => {
     vi.stubGlobal('location', {

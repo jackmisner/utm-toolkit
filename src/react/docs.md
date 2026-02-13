@@ -29,7 +29,7 @@ useState initializer --> getStoredUtmParameters() --> initial state from session
 useEffect (once, via ref guard) --> if captureOnMount && enabled:
   |
   v
-capture() --> captureUtmParameters(window.location.href) --> if has params:
+capture() --> captureUtmParameters(window.location.href, {sanitize, piiFiltering}) --> if has params:
   |                                                            storeUtmParameters()
   |                                                            setUtmParameters()
   |                                                          else if has defaultParams:

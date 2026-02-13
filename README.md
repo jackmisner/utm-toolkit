@@ -8,6 +8,7 @@ A comprehensive TypeScript library for capturing, storing, and appending UTM tra
 
 - **Capture** UTM parameters from URLs
 - **Sanitize** parameter values to prevent XSS and injection
+- **PII filtering** to detect and reject/redact email addresses, phone numbers, and other PII
 - **Store** in sessionStorage for the browser session
 - **Append** UTM parameters to share URLs
 - **Configurable** key format (snake_case or camelCase)
@@ -248,6 +249,46 @@ const params = captureUtmParameters(url, {
 });
 ```
 
+### PII Filtering
+
+Detect and filter personally identifiable information (email addresses, phone numbers) from UTM parameter values. Prevents PII from leaking into analytics via misconfigured tracking links. Disabled by default.
+
+```typescript
+import { captureUtmParameters } from '@jackmisner/utm-toolkit';
+
+// Reject mode (default) — discard values containing PII
+const params = captureUtmParameters('https://example.com?utm_source=john@example.com&utm_medium=cpc', {
+  piiFiltering: { enabled: true },
+});
+// { utm_medium: 'cpc' } — utm_source was rejected
+
+// Redact mode — replace PII values with [REDACTED]
+const params = captureUtmParameters('https://example.com?utm_source=john@example.com&utm_medium=cpc', {
+  piiFiltering: { enabled: true, mode: 'redact' },
+});
+// { utm_source: '[REDACTED]', utm_medium: 'cpc' }
+
+// Strict allowlist — only accept values matching a pattern
+const params = captureUtmParameters(url, {
+  piiFiltering: {
+    enabled: true,
+    allowlistPattern: /^[a-z0-9_-]+$/, // Only lowercase alphanumeric, hyphens, underscores
+  },
+});
+
+// Callback for logging PII detections
+const params = captureUtmParameters(url, {
+  piiFiltering: {
+    enabled: true,
+    onPiiDetected: (param, value, patternName) => {
+      console.warn(`PII detected in ${param}: matched ${patternName}`);
+    },
+  },
+});
+```
+
+Built-in PII patterns detect: email addresses, international phone numbers, UK phone numbers, and US phone numbers.
+
 ### Configuration
 
 ```typescript
@@ -332,6 +373,7 @@ installDebugHelpers();
 | `shareContextParams` | `object` | `{}` | Platform-specific params |
 | `excludeFromShares` | `string[]` | `[]` | Params to exclude from shares |
 | `sanitize` | `SanitizeConfig` | `{ enabled: false }` | Value sanitization settings |
+| `piiFiltering` | `PiiFilterConfig` | `{ enabled: false }` | PII detection and filtering |
 
 ## TypeScript Types
 
@@ -340,6 +382,8 @@ import type {
   UtmParameters,
   UtmConfig,
   SanitizeConfig,
+  PiiFilterConfig,
+  PiiPattern,
   SharePlatform,
   UseUtmTrackingReturn,
 } from '@jackmisner/utm-toolkit';

@@ -52,6 +52,11 @@ export {
   sanitizeValue,
   sanitizeParams,
 
+  // PII Filter
+  detectPii,
+  filterValue,
+  filterParams,
+
   // Validator
   validateUrl,
   normalizeUrl,
@@ -69,6 +74,8 @@ export {
 export {
   DEFAULT_CONFIG,
   DEFAULT_SANITIZE_CONFIG,
+  DEFAULT_PII_PATTERNS,
+  DEFAULT_PII_FILTER_CONFIG,
   STANDARD_UTM_PARAMETERS,
   getDefaultConfig,
   createConfig,
@@ -100,4 +107,6 @@ export type {
   UtmProviderProps,
   DiagnosticInfo,
   SanitizeConfig,
+  PiiPattern,
+  PiiFilterConfig,
 } from './types'

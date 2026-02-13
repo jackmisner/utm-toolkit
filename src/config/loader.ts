@@ -7,6 +7,7 @@
 import type {
   UtmConfig,
   ResolvedUtmConfig,
+  PiiFilterConfig,
   SanitizeConfig,
   ShareContextParams,
   UtmParameters,
@@ -55,6 +56,25 @@ function mergeSanitizeConfig(
     stripControlChars: override.stripControlChars ?? base.stripControlChars,
     maxLength: override.maxLength ?? base.maxLength,
     customPattern: override.customPattern ?? base.customPattern,
+  }
+}
+
+/**
+ * Merge PII filter config with defaults
+ */
+function mergePiiFilterConfig(
+  base: PiiFilterConfig,
+  override: Partial<PiiFilterConfig> | undefined,
+): PiiFilterConfig {
+  if (!override) {
+    return { ...base, patterns: base.patterns.map((p) => ({ ...p })) }
+  }
+  return {
+    enabled: override.enabled ?? base.enabled,
+    mode: override.mode ?? base.mode,
+    patterns: override.patterns ? [...override.patterns] : base.patterns.map((p) => ({ ...p })),
+    allowlistPattern: override.allowlistPattern ?? base.allowlistPattern,
+    onPiiDetected: override.onPiiDetected ?? base.onPiiDetected,
   }
 }
 
@@ -108,6 +128,7 @@ export function createConfig(userConfig?: Partial<UtmConfig>): ResolvedUtmConfig
       ? [...userConfig.excludeFromShares]
       : defaults.excludeFromShares,
     sanitize: mergeSanitizeConfig(defaults.sanitize, userConfig.sanitize),
+    piiFiltering: mergePiiFilterConfig(defaults.piiFiltering, userConfig.piiFiltering),
   }
 }
 
@@ -140,6 +161,7 @@ export function mergeConfig(
       ? [...override.excludeFromShares]
       : [...base.excludeFromShares],
     sanitize: mergeSanitizeConfig(base.sanitize, override.sanitize),
+    piiFiltering: mergePiiFilterConfig(base.piiFiltering, override.piiFiltering),
   }
 }
 
@@ -267,6 +289,52 @@ export function validateConfig(config: unknown): string[] {
       }
       if (s.customPattern !== undefined && !(s.customPattern instanceof RegExp)) {
         errors.push('sanitize.customPattern must be a RegExp')
+      }
+    }
+  }
+
+  if (c.piiFiltering !== undefined) {
+    if (
+      typeof c.piiFiltering !== 'object' ||
+      c.piiFiltering === null ||
+      Array.isArray(c.piiFiltering)
+    ) {
+      errors.push('piiFiltering must be an object')
+    } else {
+      const p = c.piiFiltering as Record<string, unknown>
+      if (p.enabled !== undefined && typeof p.enabled !== 'boolean') {
+        errors.push('piiFiltering.enabled must be a boolean')
+      }
+      if (p.mode !== undefined && p.mode !== 'reject' && p.mode !== 'redact') {
+        errors.push('piiFiltering.mode must be "reject" or "redact"')
+      }
+      if (p.patterns !== undefined) {
+        if (!Array.isArray(p.patterns)) {
+          errors.push('piiFiltering.patterns must be an array')
+        } else {
+          for (let i = 0; i < p.patterns.length; i++) {
+            const pat = p.patterns[i] as Record<string, unknown>
+            if (typeof pat !== 'object' || pat === null) {
+              errors.push(`piiFiltering.patterns[${i}] must be an object`)
+              continue
+            }
+            if (typeof pat.name !== 'string') {
+              errors.push(`piiFiltering.patterns[${i}].name must be a string`)
+            }
+            if (!(pat.pattern instanceof RegExp)) {
+              errors.push(`piiFiltering.patterns[${i}].pattern must be a RegExp`)
+            }
+            if (typeof pat.enabled !== 'boolean') {
+              errors.push(`piiFiltering.patterns[${i}].enabled must be a boolean`)
+            }
+          }
+        }
+      }
+      if (p.allowlistPattern !== undefined && !(p.allowlistPattern instanceof RegExp)) {
+        errors.push('piiFiltering.allowlistPattern must be a RegExp')
+      }
+      if (p.onPiiDetected !== undefined && typeof p.onPiiDetected !== 'function') {
+        errors.push('piiFiltering.onPiiDetected must be a function')
       }
     }
   }

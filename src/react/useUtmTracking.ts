@@ -122,6 +122,7 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
       keyFormat: config.keyFormat,
       allowedParameters: config.allowedParameters,
       sanitize: config.sanitize,
+      piiFiltering: config.piiFiltering,
     })
 
     // Only store if we found some parameters

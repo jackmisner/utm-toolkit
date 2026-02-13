@@ -334,6 +334,109 @@ describe('sanitize config', () => {
   })
 })
 
+describe('piiFiltering config', () => {
+  it('createConfig includes default piiFiltering', () => {
+    const config = createConfig()
+    expect(config.piiFiltering).toBeDefined()
+    expect(config.piiFiltering.enabled).toBe(false)
+    expect(config.piiFiltering.mode).toBe('reject')
+    expect(config.piiFiltering.patterns.length).toBeGreaterThan(0)
+  })
+
+  it('createConfig merges partial piiFiltering override', () => {
+    const config = createConfig({ piiFiltering: { enabled: true } })
+    expect(config.piiFiltering.enabled).toBe(true)
+    expect(config.piiFiltering.mode).toBe('reject')
+  })
+
+  it('createConfig preserves custom patterns', () => {
+    const customPatterns = [{ name: 'custom', pattern: /test/, enabled: true }]
+    const config = createConfig({ piiFiltering: { patterns: customPatterns } })
+    expect(config.piiFiltering.patterns).toEqual(customPatterns)
+  })
+
+  it('mergeConfig merges piiFiltering', () => {
+    const base = createConfig()
+    const merged = mergeConfig(base, { piiFiltering: { enabled: true, mode: 'redact' } })
+    expect(merged.piiFiltering.enabled).toBe(true)
+    expect(merged.piiFiltering.mode).toBe('redact')
+    expect(merged.piiFiltering.patterns).toEqual(base.piiFiltering.patterns)
+  })
+
+  it('validateConfig validates piiFiltering.enabled is boolean', () => {
+    const errors = validateConfig({ piiFiltering: { enabled: 'yes' } })
+    expect(errors).toContain('piiFiltering.enabled must be a boolean')
+  })
+
+  it('validateConfig validates piiFiltering.mode is valid', () => {
+    const errors = validateConfig({ piiFiltering: { mode: 'delete' } })
+    expect(errors).toContain('piiFiltering.mode must be "reject" or "redact"')
+  })
+
+  it('validateConfig validates piiFiltering.patterns is an array', () => {
+    const errors = validateConfig({ piiFiltering: { patterns: 'not an array' } })
+    expect(errors).toContain('piiFiltering.patterns must be an array')
+  })
+
+  it('validateConfig validates piiFiltering is an object', () => {
+    const errors = validateConfig({ piiFiltering: 'not an object' })
+    expect(errors).toContain('piiFiltering must be an object')
+  })
+
+  it('validateConfig validates individual pattern objects', () => {
+    const errors = validateConfig({
+      piiFiltering: {
+        patterns: [{ name: 123, pattern: 'not a regex', enabled: 'yes' }],
+      },
+    })
+    expect(errors).toContain('piiFiltering.patterns[0].name must be a string')
+    expect(errors).toContain('piiFiltering.patterns[0].pattern must be a RegExp')
+    expect(errors).toContain('piiFiltering.patterns[0].enabled must be a boolean')
+  })
+
+  it('validateConfig validates non-object pattern entries', () => {
+    const errors = validateConfig({
+      piiFiltering: { patterns: ['not an object'] },
+    })
+    expect(errors).toContain('piiFiltering.patterns[0] must be an object')
+  })
+
+  it('validateConfig validates allowlistPattern is a RegExp', () => {
+    const errors = validateConfig({
+      piiFiltering: { allowlistPattern: 'not a regex' },
+    })
+    expect(errors).toContain('piiFiltering.allowlistPattern must be a RegExp')
+  })
+
+  it('validateConfig accepts valid allowlistPattern RegExp', () => {
+    const errors = validateConfig({
+      piiFiltering: { allowlistPattern: /^[a-z]+$/ },
+    })
+    expect(errors).toEqual([])
+  })
+
+  it('validateConfig validates onPiiDetected is a function', () => {
+    const errors = validateConfig({
+      piiFiltering: { onPiiDetected: 'not a function' },
+    })
+    expect(errors).toContain('piiFiltering.onPiiDetected must be a function')
+  })
+
+  it('validateConfig accepts valid onPiiDetected function', () => {
+    const errors = validateConfig({
+      piiFiltering: { onPiiDetected: () => {} },
+    })
+    expect(errors).toEqual([])
+  })
+
+  it('validateConfig accepts valid piiFiltering config', () => {
+    const errors = validateConfig({
+      piiFiltering: { enabled: true, mode: 'redact' },
+    })
+    expect(errors).toEqual([])
+  })
+})
+
 describe('getDefaultConfig', () => {
   it('returns a copy of default config', () => {
     const config1 = getDefaultConfig()

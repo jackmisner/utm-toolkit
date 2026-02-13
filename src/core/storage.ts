@@ -103,7 +103,9 @@ function isEnvelopeFormat(data: unknown): data is StoredUtmEnvelope {
     typeof obj.params === 'object' &&
     obj.params !== null &&
     'iat' in obj &&
-    typeof obj.iat === 'number'
+    typeof obj.iat === 'number' &&
+    'eat' in obj &&
+    (obj.eat === null || typeof obj.eat === 'number')
   )
 }
 

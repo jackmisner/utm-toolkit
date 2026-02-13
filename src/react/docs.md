@@ -19,7 +19,7 @@ Path: @/src/react
 
 **Data flow through `useUtmTracking`:**
 
-```
+```text
 Mount
   |
   v

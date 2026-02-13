@@ -20,7 +20,7 @@ Path: @/src
 
 The library follows a layered architecture:
 
-```
+```text
 Consumer API
   |
   +--> src/index.ts (barrel) -----> core/   config/   debug/   types/

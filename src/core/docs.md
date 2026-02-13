@@ -19,7 +19,7 @@ Path: @/src/core
 
 The data flow through the core modules follows this path:
 
-```
+```text
 URL string
     |
     v

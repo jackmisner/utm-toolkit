@@ -17,7 +17,7 @@
 
 ## Releases
 
-Releases are done via `npm run release:patch|minor|major` which creates a `release/<version>` branch from main. The tag push triggers the publish workflow.
+Releases are done via `npm run release:patch|minor|major` which creates a `release/<version>` branch from main. Pushing the tag triggers the publish workflow.
 
 ## Test Setup
 

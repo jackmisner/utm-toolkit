@@ -121,6 +121,7 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
     const params = captureUtmParameters(window.location.href, {
       keyFormat: config.keyFormat,
       allowedParameters: config.allowedParameters,
+      sanitize: config.sanitize,
     })
 
     // Only store if we found some parameters

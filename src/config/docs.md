@@ -13,14 +13,15 @@ Path: @/src/config
 - `createConfig()` is the primary entry point, called by `useUtmTracking` in `@/src/react` to resolve user-provided partial config into a complete `ResolvedUtmConfig`.
 - `@/src/debug` imports `getDefaultConfig()` from here as a fallback when no config is provided to diagnostic functions.
 - `DEFAULT_CONFIG` and `STANDARD_UTM_PARAMETERS` are the canonical definitions of default behavior (enabled, snake_case, sessionStorage key `utm_parameters`, auto-capture on mount, append to shares, the 6 standard UTM params).
+- `DEFAULT_SANITIZE_CONFIG` defines the sanitization defaults: disabled by default, but with safe-by-default values when enabled (`stripHtml: true`, `stripControlChars: true`, `maxLength: 200`). It is exported as a public constant and spread into `DEFAULT_CONFIG.sanitize`.
 - The config system does not perform side effects -- it is pure data transformation.
 
 ### Core Implementation
 
-- `createConfig()` merges a partial user config with defaults using nullish coalescing (`??`) for scalar fields. Array fields (`allowedParameters`, `excludeFromShares`) are replaced wholesale when provided by the user, not merged. Object fields (`defaultParams`, `shareContextParams`) are shallow-merged.
+- `createConfig()` merges a partial user config with defaults using nullish coalescing (`??`) for scalar fields. Array fields (`allowedParameters`, `excludeFromShares`) are replaced wholesale when provided by the user, not merged. Object fields (`defaultParams`, `shareContextParams`) are shallow-merged. The `sanitize` field is merged via `mergeSanitizeConfig()`, which uses nullish coalescing per-field so partial overrides preserve unspecified defaults.
 - `mergeConfig()` follows the same semantics but takes a `ResolvedUtmConfig` as the base instead of implicitly using defaults -- useful for layering configurations.
 - `loadConfigFromJson()` accepts `unknown` input, validates it is a non-null non-array object, then delegates to `createConfig()`. Invalid input falls back to defaults with a `console.warn`.
-- `validateConfig()` performs runtime type checking on each config field and returns an array of error message strings (empty array means valid).
+- `validateConfig()` performs runtime type checking on each config field and returns an array of error message strings (empty array means valid). Sanitize validation checks that `sanitize` is an object, `enabled`/`stripHtml`/`stripControlChars` are booleans, and `maxLength` is a positive number.
 - `getDefaultConfig()` returns a shallow copy of `DEFAULT_CONFIG` with cloned arrays and objects to prevent mutation of the shared constant.
 
 ### Things to Know

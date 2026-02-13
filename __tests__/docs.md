@@ -18,8 +18,8 @@ Path: @/__tests__
 ### Core Implementation
 
 - **`setup.ts`**: Creates a fresh sessionStorage mock and location mock in `beforeEach`, ensuring tests are isolated. The storage mock implements `getItem`, `setItem`, `removeItem`, `clear`, `length`, and `key`. Location is stubbed with `href`, `search`, `hash`, `pathname`, `protocol`, `host`, and `hostname`.
-- **`core/` tests**: Cover capture (URL parsing, allowed parameters, key format conversion, SSR fallback), storage (write/read/clear, format conversion, validation of stored data, silent failure), appender (query/fragment placement, preserveExisting, remove, extract), keys (bidirectional conversion, standard and custom keys, detection, validation), and validator (protocol, domain, normalization, mutable default protocol).
-- **`config/` tests**: Cover `createConfig` merging semantics (nullish coalescing, array replacement, object merge), `validateConfig` error messages, and `loadConfigFromJson` fallback behavior.
+- **`core/` tests**: Cover capture (URL parsing, allowed parameters, key format conversion, SSR fallback, sanitization integration), sanitizer (HTML stripping, control character removal, custom patterns, truncation, combined rules), storage (write/read/clear, format conversion, validation of stored data, silent failure), appender (query/fragment placement, preserveExisting, remove, extract), keys (bidirectional conversion, standard and custom keys, detection, validation), and validator (protocol, domain, normalization, mutable default protocol).
+- **`config/` tests**: Cover `createConfig` merging semantics (nullish coalescing, array replacement, object merge), `validateConfig` error messages, `loadConfigFromJson` fallback behavior, and sanitize config handling (default inclusion, partial merge, custom pattern preservation, validation of each sanitize field).
 - **`react/` tests**: Use `@testing-library/react` `renderHook` and `render` to test `useUtmTracking` (auto-capture, manual capture, clear, appendToUrl with share context and exclusions) and `UtmProvider`/`useUtmContext` (context propagation, error on missing provider).
 
 ### Things to Know

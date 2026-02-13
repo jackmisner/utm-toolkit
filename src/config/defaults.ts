@@ -4,7 +4,18 @@
  * Provides sensible defaults for UTM toolkit configuration.
  */
 
-import type { ResolvedUtmConfig } from '../types'
+import type { ResolvedUtmConfig, SanitizeConfig } from '../types'
+
+/**
+ * Default sanitization configuration
+ * Sanitization is disabled by default but has safe defaults when enabled
+ */
+export const DEFAULT_SANITIZE_CONFIG: SanitizeConfig = {
+  enabled: false,
+  stripHtml: true,
+  stripControlChars: true,
+  maxLength: 200,
+}
 
 /**
  * Standard UTM parameters (snake_case format for URLs)
@@ -49,6 +60,9 @@ export const DEFAULT_CONFIG: ResolvedUtmConfig = {
 
   /** No parameters excluded from shares by default */
   excludeFromShares: [],
+
+  /** Sanitization disabled by default */
+  sanitize: { ...DEFAULT_SANITIZE_CONFIG },
 }
 
 /**
@@ -62,5 +76,6 @@ export function getDefaultConfig(): ResolvedUtmConfig {
     defaultParams: { ...DEFAULT_CONFIG.defaultParams },
     shareContextParams: { ...DEFAULT_CONFIG.shareContextParams },
     excludeFromShares: [...DEFAULT_CONFIG.excludeFromShares],
+    sanitize: { ...DEFAULT_CONFIG.sanitize },
   }
 }

@@ -4,7 +4,13 @@
  * Provides utilities for loading and merging UTM toolkit configuration.
  */
 
-import type { UtmConfig, ResolvedUtmConfig, ShareContextParams, UtmParameters } from '../types'
+import type {
+  UtmConfig,
+  ResolvedUtmConfig,
+  SanitizeConfig,
+  ShareContextParams,
+  UtmParameters,
+} from '../types'
 import { DEFAULT_CONFIG, getDefaultConfig } from './defaults'
 
 /**
@@ -31,6 +37,25 @@ function mergeShareContextParams(
   }
 
   return result
+}
+
+/**
+ * Merge sanitize config with defaults
+ */
+function mergeSanitizeConfig(
+  base: SanitizeConfig,
+  override: Partial<SanitizeConfig> | undefined,
+): SanitizeConfig {
+  if (!override) {
+    return { ...base }
+  }
+  return {
+    enabled: override.enabled ?? base.enabled,
+    stripHtml: override.stripHtml ?? base.stripHtml,
+    stripControlChars: override.stripControlChars ?? base.stripControlChars,
+    maxLength: override.maxLength ?? base.maxLength,
+    customPattern: override.customPattern ?? base.customPattern,
+  }
 }
 
 /**
@@ -82,6 +107,7 @@ export function createConfig(userConfig?: Partial<UtmConfig>): ResolvedUtmConfig
     excludeFromShares: userConfig.excludeFromShares
       ? [...userConfig.excludeFromShares]
       : defaults.excludeFromShares,
+    sanitize: mergeSanitizeConfig(defaults.sanitize, userConfig.sanitize),
   }
 }
 
@@ -113,6 +139,7 @@ export function mergeConfig(
     excludeFromShares: override.excludeFromShares
       ? [...override.excludeFromShares]
       : [...base.excludeFromShares],
+    sanitize: mergeSanitizeConfig(base.sanitize, override.sanitize),
   }
 }
 
@@ -216,6 +243,32 @@ export function validateConfig(config: unknown): string[] {
       Array.isArray(c.shareContextParams))
   ) {
     errors.push('shareContextParams must be an object')
+  }
+
+  if (c.sanitize !== undefined) {
+    if (typeof c.sanitize !== 'object' || c.sanitize === null || Array.isArray(c.sanitize)) {
+      errors.push('sanitize must be an object')
+    } else {
+      const s = c.sanitize as Record<string, unknown>
+      if (s.enabled !== undefined && typeof s.enabled !== 'boolean') {
+        errors.push('sanitize.enabled must be a boolean')
+      }
+      if (s.stripHtml !== undefined && typeof s.stripHtml !== 'boolean') {
+        errors.push('sanitize.stripHtml must be a boolean')
+      }
+      if (s.stripControlChars !== undefined && typeof s.stripControlChars !== 'boolean') {
+        errors.push('sanitize.stripControlChars must be a boolean')
+      }
+      if (
+        s.maxLength !== undefined &&
+        (typeof s.maxLength !== 'number' || !Number.isFinite(s.maxLength) || s.maxLength <= 0)
+      ) {
+        errors.push('sanitize.maxLength must be a positive finite number')
+      }
+      if (s.customPattern !== undefined && !(s.customPattern instanceof RegExp)) {
+        errors.push('sanitize.customPattern must be a RegExp')
+      }
+    }
   }
 
   return errors

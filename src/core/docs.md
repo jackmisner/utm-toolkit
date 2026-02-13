@@ -23,7 +23,7 @@ The data flow through the core modules follows this path:
 URL string
     |
     v
-[capture.ts] -- parses URL, filters to utm_* keys, applies allowedParameters, converts key format
+[capture.ts] -- parses URL, filters to utm_* keys, applies allowedParameters, sanitizes values, converts key format
     |
     v
 UtmParameters object
@@ -40,7 +40,9 @@ URL string with UTM params
 
 - **keys.ts**: Bidirectional key conversion between `snake_case` and `camelCase`. Uses lookup tables (`SNAKE_TO_CAMEL`, `CAMEL_TO_SNAKE`) for the 6 standard keys and regex-based conversion for custom keys. `isSnakeCaseUtmKey` checks for `utm_` prefix; `isCamelCaseUtmKey` checks for `utm` followed by an uppercase letter. `detectKeyFormat` scans keys and returns the first format found, defaulting to `snake_case` for empty objects.
 
-- **capture.ts**: `captureUtmParameters()` takes a URL string (defaulting to `window.location.href`), parses it via `new URL()`, iterates `searchParams`, and filters to keys passing `isSnakeCaseUtmKey`. Optionally filters by an `allowedParameters` set and converts output via `convertParams`.
+- **capture.ts**: `captureUtmParameters()` takes a URL string (defaulting to `window.location.href`), parses it via `new URL()`, iterates `searchParams`, and filters to keys passing `isSnakeCaseUtmKey`. Optionally filters by an `allowedParameters` set, applies value sanitization when `sanitize.enabled` is true, then converts output via `convertParams`. The pipeline order is: extract params --> filter by allowlist --> sanitize --> convert key format.
+
+- **sanitizer.ts**: `sanitizeValue()` strips dangerous characters from a single string value. Rules apply in order: HTML-significant characters (`< > " ' \``) --> control characters (\x00-\x1F except tab/newline/CR) --> optional custom regex pattern --> trim --> truncate to `maxLength`. `sanitizeParams()` applies `sanitizeValue()` to every non-undefined value in a `UtmParameters` object, returning a new object with keys preserved unchanged. Both functions are pure and stateless; all behavior is driven by the `SanitizeConfig` argument.
 
 - **storage.ts**: Uses sessionStorage with a configurable key (default: `utm_parameters`). Write operations skip empty param objects and fail silently with `console.warn`. Read operations validate parsed JSON with `isValidStoredData()`, which checks that all keys pass `isUtmKey` and all values are strings or undefined.
 
@@ -55,5 +57,6 @@ URL string with UTM params
 - **Silent failure**: Storage and capture operations never throw. Errors produce `console.warn` messages and return fallback values. The appender returns the original URL unchanged on failure.
 - **validator.ts mutable state**: `defaultProtocol` is module-level mutable state modified via `setDefaultProtocol()`. This is global -- all callers share the same default protocol. Tests that call `setDefaultProtocol()` should restore the original value.
 - **Fragment parameter handling in appender**: When appending to query, conflicting UTM params are removed from the fragment. When appending to fragment, conflicting UTM params are removed from the query. Only fragments that contain `=` are treated as parameter-bearing; plain anchors like `#section` are left alone.
+- **Sanitization is capture-time only**: Sanitization runs during `captureUtmParameters()` before values enter the system. It does not run at storage time, append time, or on read. This means values stored in sessionStorage are already sanitized if sanitization was enabled at capture.
 
 Created and maintained by Nori.

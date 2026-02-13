@@ -327,6 +327,31 @@ describe('useUtmTracking', () => {
     })
   })
 
+  describe('PII filtering', () => {
+    it('filters PII values when piiFiltering is enabled', () => {
+      vi.stubGlobal('location', {
+        href: 'https://example.com?utm_source=john@example.com&utm_medium=email',
+        search: '?utm_source=john@example.com&utm_medium=email',
+      })
+
+      const { result } = renderHook(() =>
+        useUtmTracking({
+          config: {
+            captureOnMount: false,
+            piiFiltering: { enabled: true },
+          },
+        }),
+      )
+
+      act(() => {
+        result.current.capture()
+      })
+
+      expect(result.current.utmParameters).not.toHaveProperty('utm_source')
+      expect(result.current.utmParameters?.utm_medium).toBe('email')
+    })
+  })
+
   describe('key format', () => {
     it('uses snake_case by default', () => {
       vi.stubGlobal('location', {

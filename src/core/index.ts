@@ -51,6 +51,9 @@ export {
 // Sanitizer utilities
 export { sanitizeValue, sanitizeParams } from './sanitizer'
 
+// PII filter utilities
+export { detectPii, filterValue, filterParams } from './pii-filter'
+
 // Validator utilities
 export {
   validateUrl,

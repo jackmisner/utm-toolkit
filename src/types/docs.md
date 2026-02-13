@@ -24,6 +24,7 @@ Path: @/src/types
 - `ShareContextParams` uses `Partial<Record<SharePlatform, UtmParameters>>` with a `default` key for base params and platform-specific overrides, enabling a layered merge strategy in `useUtmTracking`'s `appendToUrl` callback.
 - `AppendOptions` controls whether UTM params go into query string or fragment, and whether existing UTM params on the target URL are preserved.
 - `SanitizeConfig` defines value sanitization behavior with fields for `enabled`, `stripHtml`, `stripControlChars`, `maxLength`, and an optional `customPattern` (RegExp). It appears as `Partial<SanitizeConfig>` on `UtmConfig` (user input) and as a required `SanitizeConfig` on `ResolvedUtmConfig` (resolved output). This follows the same partial-in/resolved-out pattern used by the rest of the config system.
+- `PiiPattern` defines a named regex pattern with an `enabled` toggle. `PiiFilterConfig` groups these patterns with a `mode` (`'reject'` or `'redact'`), an optional `allowlistPattern` (RegExp for strict validation), and an optional synchronous `onPiiDetected` callback. Like `SanitizeConfig`, it appears as `Partial<PiiFilterConfig>` on `UtmConfig` and as a required `PiiFilterConfig` on `ResolvedUtmConfig`.
 
 ### Things to Know
 

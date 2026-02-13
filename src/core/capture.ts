@@ -5,9 +5,10 @@
  * Supports standard UTM parameters and custom utm_ prefixed parameters.
  */
 
-import type { KeyFormat, SanitizeConfig, UtmParameters } from '../types'
-import { DEFAULT_SANITIZE_CONFIG } from '../config/defaults'
+import type { KeyFormat, PiiFilterConfig, SanitizeConfig, UtmParameters } from '../types'
+import { DEFAULT_PII_FILTER_CONFIG, DEFAULT_SANITIZE_CONFIG } from '../config/defaults'
 import { convertParams, isSnakeCaseUtmKey } from './keys'
+import { filterParams } from './pii-filter'
 import { sanitizeParams } from './sanitizer'
 
 /**
@@ -22,6 +23,9 @@ export interface CaptureOptions {
 
   /** Sanitization configuration — when enabled, strips dangerous characters from values */
   sanitize?: Partial<SanitizeConfig>
+
+  /** PII filtering configuration — when enabled, detects and filters PII from values */
+  piiFiltering?: Partial<PiiFilterConfig>
 }
 
 /**
@@ -64,7 +68,7 @@ function isBrowser(): boolean {
  * ```
  */
 export function captureUtmParameters(url?: string, options: CaptureOptions = {}): UtmParameters {
-  const { keyFormat = 'snake_case', allowedParameters, sanitize } = options
+  const { keyFormat = 'snake_case', allowedParameters, sanitize, piiFiltering } = options
 
   // Get URL, defaulting to current page URL in browser
   const urlString = url ?? (isBrowser() ? window.location.href : '')
@@ -96,9 +100,19 @@ export function captureUtmParameters(url?: string, options: CaptureOptions = {})
 
     // Apply sanitization if configured and enabled
     const resolvedSanitize: SanitizeConfig = { ...DEFAULT_SANITIZE_CONFIG, ...sanitize }
-    const captured: UtmParameters = resolvedSanitize.enabled
+    const sanitized: UtmParameters = resolvedSanitize.enabled
       ? sanitizeParams(params as UtmParameters, resolvedSanitize)
       : (params as UtmParameters)
+
+    // Apply PII filtering if configured and enabled
+    const resolvedPiiFilter: PiiFilterConfig = {
+      ...DEFAULT_PII_FILTER_CONFIG,
+      ...piiFiltering,
+      patterns: piiFiltering?.patterns ?? [...DEFAULT_PII_FILTER_CONFIG.patterns],
+    }
+    const captured: UtmParameters = resolvedPiiFilter.enabled
+      ? filterParams(sanitized, resolvedPiiFilter)
+      : sanitized
 
     // Convert to target format if needed
     if (keyFormat === 'camelCase') {

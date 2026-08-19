@@ -1,0 +1,60 @@
+version: 2
+updates:
+  # GitHub Actions: grouped into one weekly PR. Workflows live under
+  # .github/workflows and pin actions by tag (@v4), which Dependabot tracks.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # npm dependencies (published dual ESM/CJS library — devDependencies only,
+  # there are no runtime dependencies).
+  #   * minor + patch → grouped into ONE weekly PR.
+  #   * major bumps are deliberately NOT grouped — Dependabot raises one PR per
+  #     major so each can be triaged on its own (breaking changes / migrations).
+  #     A grouped batch must never be blocked by one incompatible major.
+  # No semver labels here: releases are cut manually via `npm run release:*`,
+  # so merging a dependency PR must not trigger a publish.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    labels:
+      - "dependencies"
+    # react/react-dom/@types/react are devDependencies used to exercise the
+    # React entry point, but package.json advertises `peerDependencies: react
+    # >=16.8.0`. Taking the dev copies to a new major silently changes which
+    # point of that supported range CI actually tests — it would stop
+    # exercising the floor while the package still claims to support it.
+    # That is a support-matrix decision, not a weekly bump: move the tested
+    # React line deliberately (and revisit the peer range at the same time),
+    # then remove these entries. Minor/patch still flow.
+    ignore:
+      - dependency-name: "react"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "react-dom"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "@types/react"
+        update-types:
+          - "version-update:semver-major"
+    groups:
+      npm-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

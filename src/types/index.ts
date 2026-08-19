@@ -41,12 +41,7 @@ export interface AttributionConfig {
  * Standard UTM parameter keys in snake_case (URL format)
  */
 export type StandardSnakeCaseUtmKey =
-  | 'utm_source'
-  | 'utm_medium'
-  | 'utm_campaign'
-  | 'utm_term'
-  | 'utm_content'
-  | 'utm_id'
+  'utm_source' | 'utm_medium' | 'utm_campaign' | 'utm_term' | 'utm_content' | 'utm_id'
 
 /**
  * Any UTM key in snake_case format (includes custom params like utm_team_id)
@@ -57,12 +52,7 @@ export type SnakeCaseUtmKey = StandardSnakeCaseUtmKey | `utm_${string}`
  * Standard UTM parameter keys in camelCase (TypeScript format)
  */
 export type StandardCamelCaseUtmKey =
-  | 'utmSource'
-  | 'utmMedium'
-  | 'utmCampaign'
-  | 'utmTerm'
-  | 'utmContent'
-  | 'utmId'
+  'utmSource' | 'utmMedium' | 'utmCampaign' | 'utmTerm' | 'utmContent' | 'utmId'
 
 /**
  * UTM parameters object using snake_case keys (URL format)

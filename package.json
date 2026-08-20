@@ -70,15 +70,15 @@
   "devDependencies": {
     "@testing-library/react": "^16.0.0",
     "@types/react": "^18.0.0",
-    "@vitest/coverage-v8": "^2.0.0",
-    "jsdom": "^25.0.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "jsdom": "^30.0.1",
     "oxlint": "^1.0.0",
     "prettier": "^3.0.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "tsup": "^8.5.1",
     "typescript": "^5.0.0",
-    "vitest": "^2.0.0"
+    "vitest": "^4.1.11"
   },
   "keywords": [
     "utm",
@@ -101,6 +101,6 @@
   },
   "homepage": "https://github.com/jackmisner/utm-toolkit#readme",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=20.0.0"
   }
 }

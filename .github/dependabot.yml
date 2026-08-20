@@ -51,6 +51,15 @@ updates:
     # and with @testing-library/react's own peer range — so it should be changed
     # on purpose, not carried in on a weekly bump. Minor/patch still flow.
     ignore:
+      # typescript majors are blocked upstream, not by choice. tsup bundles
+      # rollup-plugin-dts pinned against typescript 5.x, and TS 7 removed the
+      # `useCaseSensitiveFileNames` API it calls, so `npm run build` dies before
+      # emitting declarations. Nothing in this repo can fix that. Remove this
+      # entry once tsup ships a TS 7-compatible rollup-plugin-dts, then upgrade
+      # the two together. Minor/patch still flow.
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
       - dependency-name: "react"
         update-types:
           - "version-update:semver-major"
@@ -61,6 +70,15 @@ updates:
         update-types:
           - "version-update:semver-major"
     groups:
+      # vitest and @vitest/coverage-v8 are lockstep-versioned: coverage-v8@4.x
+      # peer-requires the exact matching vitest. Ungrouped majors raised them as
+      # two separate PRs, and each failed `npm ci` on the peer conflict because
+      # neither could land without the other. This group covers ALL update types
+      # for that family, majors included, so they always move as one.
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
       npm-minor-patch:
         patterns:
           - "*"

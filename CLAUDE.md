@@ -21,10 +21,12 @@ Releases are done via `npm run release:patch|minor|major` which creates a `relea
 
 ## Dependency Updates
 
-Dependabot runs weekly (`.github/dependabot.yml`). Minor/patch npm bumps arrive as one grouped PR; majors get individual PRs. Two things to know:
+Dependabot runs weekly (`.github/dependabot.yml`). Minor/patch npm bumps arrive as one grouped PR; majors get individual PRs, except where noted below.
 
 - **React majors are ignored on purpose.** Which React line the tests run against is a support-matrix decision tied to the `peerDependencies: react >=16.8.0` claim, so it gets changed deliberately rather than by a weekly bump.
-- **oxlint does not run on Node 18.** Its native bindings require Node `^20.19.0 || >=22.12.0`, so npm skips installing them and oxlint fails with `Cannot find module './oxlint.linux-x64-gnu.node'`. `ci-node18.yml` therefore has no lint step — lint runs on the Node 20 and 22 jobs only. Do not "fix" this by pinning oxlint back; linting the same source once is enough, and the Node 18 job exists to prove the library runs there, not to re-lint it.
+- **TypeScript majors are ignored because they are blocked upstream.** tsup bundles `rollup-plugin-dts` pinned against TypeScript 5.x, and TS 7 removed the `useCaseSensitiveFileNames` API it calls, so `npm run build` fails before emitting declarations. Remove the ignore once tsup ships a TS 7-compatible `rollup-plugin-dts`.
+- **vitest and `@vitest/coverage-v8` are grouped, majors included.** `coverage-v8` peer-requires the exact matching vitest version, so raised separately neither can pass `npm ci`.
+- **The test toolchain sets the Node floor, not the library.** jsdom requires Node 22+ and vitest requires 20+, so CI tests 22/24/26. `engines.node` is `>=20.0.0`: the published bundle has no Node-version-specific code, but nothing below 22 is exercised. Raise the floor rather than pinning the toolchain back if this ever conflicts.
 
 ## Test Setup
 

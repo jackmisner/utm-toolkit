@@ -26,6 +26,16 @@
         "types": "./dist/react/index.d.cts",
         "default": "./dist/react/index.cjs"
       }
+    },
+    "./server": {
+      "import": {
+        "types": "./dist/server/index.d.ts",
+        "default": "./dist/server/index.js"
+      },
+      "require": {
+        "types": "./dist/server/index.d.cts",
+        "default": "./dist/server/index.cjs"
+      }
     }
   },
   "files": [

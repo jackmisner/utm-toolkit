@@ -27,9 +27,11 @@ import type { CaptureOptions } from './capture'
  * - `maxLength` — the value exceeded `sanitize.maxLength` under `onMaxLength: 'drop'`
  * - `allowlist` — the value failed `piiFiltering.allowlistPattern`
  * - `pii` — a PII detection pattern matched; see `patternName`
+ * - `notAString` — the value was not a string (server-side only; a URL's
+ *   search parameters are always strings, so this cannot arise from capture)
  */
 export type UtmRejectionReason =
-  'allowedParameters' | 'valuePattern' | 'maxLength' | 'allowlist' | 'pii'
+  'allowedParameters' | 'valuePattern' | 'maxLength' | 'allowlist' | 'pii' | 'notAString'
 
 /**
  * A single rejected UTM parameter

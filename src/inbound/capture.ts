@@ -21,6 +21,19 @@ export interface CaptureOptions {
   /** Allowlist of parameters to capture (snake_case format, e.g., ['utm_source', 'utm_campaign']) */
   allowedParameters?: string[]
 
+  /**
+   * Lowercase all captured values (default: false)
+   *
+   * Mirrors `BuildUtmUrlOptions.lowercaseValues` on the outbound side. Applied
+   * before sanitization and PII filtering, so every downstream gate —
+   * `sanitize.customPattern`, `sanitize.valuePattern` and
+   * `piiFiltering.allowlistPattern` — sees the folded value and can be written
+   * without allowing uppercase.
+   *
+   * Keys are unaffected; only values are folded.
+   */
+  lowercaseValues?: boolean
+
   /** Sanitization configuration — when enabled, strips dangerous characters from values */
   sanitize?: Partial<SanitizeConfig>
 
@@ -71,7 +84,14 @@ function isBrowser(): boolean {
  * ```
  */
 export function captureUtmParameters(url?: string, options: CaptureOptions = {}): UtmParameters {
-  const { keyFormat = 'snake_case', allowedParameters, sanitize, piiFiltering, onCapture } = options
+  const {
+    keyFormat = 'snake_case',
+    allowedParameters,
+    lowercaseValues = false,
+    sanitize,
+    piiFiltering,
+    onCapture,
+  } = options
 
   // Get URL, defaulting to current page URL in browser
   const urlString = url ?? (isBrowser() ? window.location.href : '')
@@ -96,7 +116,9 @@ export function captureUtmParameters(url?: string, options: CaptureOptions = {})
       if (isSnakeCaseUtmKey(key)) {
         // If allowedParameters is provided, check if this parameter is allowed
         if (allowedSet === null || allowedSet.has(key)) {
-          params[key] = value
+          // toLowerCase(), never toLocaleLowerCase(): folding must not depend on
+          // the host locale. 'I'.toLocaleLowerCase() is a dotless i under tr-TR.
+          params[key] = lowercaseValues ? value.toLowerCase() : value
         }
       }
     }

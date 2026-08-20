@@ -119,6 +119,7 @@ export function useUtmTracking(options: UseUtmTrackingOptions = {}): UseUtmTrack
     const params = captureUtmParameters(window.location.href, {
       keyFormat: config.keyFormat,
       allowedParameters: config.allowedParameters,
+      lowercaseValues: config.lowercaseValues,
       sanitize: config.sanitize,
       piiFiltering: config.piiFiltering,
       onCapture: config.onCapture,

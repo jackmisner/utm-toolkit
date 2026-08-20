@@ -246,6 +246,7 @@ describe('sanitize config', () => {
       stripHtml: true,
       stripControlChars: true,
       maxLength: 200,
+      onMaxLength: 'truncate',
     })
   })
 

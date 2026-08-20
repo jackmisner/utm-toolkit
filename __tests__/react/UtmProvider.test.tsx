@@ -74,6 +74,36 @@ describe('UtmProvider', () => {
     expect(screen.getByTestId('params').textContent).toBe('{"utm_source":"auto_capture"}')
   })
 
+  it('forwards lowercaseValues from config to the capture pipeline', () => {
+    vi.stubGlobal('location', {
+      href: 'https://example.com?utm_source=LinkedIn',
+      search: '?utm_source=LinkedIn',
+    })
+
+    render(
+      <UtmProvider config={{ captureOnMount: true, lowercaseValues: true }}>
+        <TestConsumer />
+      </UtmProvider>,
+    )
+
+    expect(screen.getByTestId('params').textContent).toBe('{"utm_source":"linkedin"}')
+  })
+
+  it('does not lowercase via config by default', () => {
+    vi.stubGlobal('location', {
+      href: 'https://example.com?utm_source=LinkedIn',
+      search: '?utm_source=LinkedIn',
+    })
+
+    render(
+      <UtmProvider config={{ captureOnMount: true }}>
+        <TestConsumer />
+      </UtmProvider>,
+    )
+
+    expect(screen.getByTestId('params').textContent).toBe('{"utm_source":"LinkedIn"}')
+  })
+
   it('uses custom storage key', () => {
     sessionStorage.setItem('custom_provider_key', '{"utm_source":"custom"}')
 

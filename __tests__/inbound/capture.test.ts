@@ -230,6 +230,69 @@ describe('sanitization integration', () => {
   })
 })
 
+describe('lowercaseValues', () => {
+  it('does not lowercase by default, preserving current behaviour', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=LinkedIn')
+    expect(result.utm_source).toBe('LinkedIn')
+  })
+
+  it('folds values to lowercase when enabled', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=LinkedIn', {
+      lowercaseValues: true,
+    })
+    expect(result.utm_source).toBe('linkedin')
+  })
+
+  it('folds every value, not just the first', () => {
+    const result = captureUtmParameters(
+      'https://example.com?utm_source=LinkedIn&utm_campaign=Spring2025',
+      { lowercaseValues: true },
+    )
+    expect(result).toEqual({ utm_source: 'linkedin', utm_campaign: 'spring2025' })
+  })
+
+  it('leaves keys untouched', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=LinkedIn', {
+      lowercaseValues: true,
+    })
+    expect(Object.keys(result)).toEqual(['utm_source'])
+  })
+
+  it('works without sanitization enabled', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=LinkedIn', {
+      lowercaseValues: true,
+      sanitize: { enabled: false },
+    })
+    expect(result.utm_source).toBe('linkedin')
+  })
+
+  // This is the test that pins the pipeline order. It can only pass if folding
+  // runs before the PII allowlist gate; a refactor that reorders the stages
+  // fails here.
+  it('folds before the PII allowlist gate, so a lowercase-only pattern accepts it', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=LinkedIn', {
+      lowercaseValues: true,
+      piiFiltering: { enabled: true, allowlistPattern: /^[a-z]+$/ },
+    })
+    expect(result.utm_source).toBe('linkedin')
+  })
+
+  it('folds before the sanitize valuePattern gate', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=LinkedIn', {
+      lowercaseValues: true,
+      sanitize: { enabled: true, valuePattern: /^[a-z]+$/ },
+    })
+    expect(result.utm_source).toBe('linkedin')
+  })
+
+  it('rejects a mixed-case value under a lowercase-only gate when folding is off', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=LinkedIn', {
+      sanitize: { enabled: true, valuePattern: /^[a-z]+$/ },
+    })
+    expect(result.utm_source).toBe('')
+  })
+})
+
 describe('PII filtering integration', () => {
   const piiFilterConfig = {
     enabled: true,

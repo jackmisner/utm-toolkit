@@ -119,6 +119,7 @@ export function createConfig(userConfig?: Partial<UtmConfig>): ResolvedUtmConfig
     ttl: userConfig.ttl ?? defaults.ttl,
     captureOnMount: userConfig.captureOnMount ?? defaults.captureOnMount,
     appendToShares: userConfig.appendToShares ?? defaults.appendToShares,
+    lowercaseValues: userConfig.lowercaseValues ?? defaults.lowercaseValues,
     allowedParameters: userConfig.allowedParameters
       ? [...userConfig.allowedParameters]
       : defaults.allowedParameters,
@@ -177,6 +178,7 @@ export function mergeConfig(
     ttl: override.ttl ?? base.ttl,
     captureOnMount: override.captureOnMount ?? base.captureOnMount,
     appendToShares: override.appendToShares ?? base.appendToShares,
+    lowercaseValues: override.lowercaseValues ?? base.lowercaseValues,
     allowedParameters: override.allowedParameters
       ? [...override.allowedParameters]
       : [...base.allowedParameters],

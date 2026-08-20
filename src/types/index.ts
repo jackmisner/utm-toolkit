@@ -144,8 +144,33 @@ export interface SanitizeConfig {
   /** Maximum allowed length for parameter values (default: 200) */
   maxLength: number
 
-  /** Optional additional regex pattern to strip from values */
+  /**
+   * What to do with a value longer than `maxLength` (default: 'truncate').
+   *
+   * `'truncate'` cuts the value to `maxLength`. `'drop'` replaces it with `''`.
+   * Prefer `'drop'` when values key a datastore: a truncated value is one nobody
+   * sent, and two campaigns sharing a long prefix collapse into one.
+   */
+  onMaxLength?: 'truncate' | 'drop'
+
+  /**
+   * Optional additional regex pattern to strip from values.
+   *
+   * Subtractive: every match is removed from the value. Contrast `valuePattern`,
+   * which accepts or drops the value as a whole.
+   */
   customPattern?: RegExp
+
+  /**
+   * Optional positive allowlist for values. A value not matching becomes `''`.
+   *
+   * A gate, not a filter: the value is kept intact or dropped entirely. Tested
+   * against the trimmed value, so incidental whitespace does not cause a
+   * rejection. Contrast `customPattern` (subtractive) and
+   * `PiiFilterConfig.allowlistPattern` (the same gate, but scoped to PII
+   * decisions and able to produce `'[REDACTED]'` in redact mode).
+   */
+  valuePattern?: RegExp
 }
 
 /**
@@ -220,6 +245,13 @@ export interface UtmConfig {
    */
   allowedParameters?: string[]
 
+  /**
+   * Lowercase all captured values (default: false)
+   *
+   * Forwarded to the capture pipeline; see `CaptureOptions.lowercaseValues`.
+   */
+  lowercaseValues?: boolean
+
   /** Default UTM parameters when none are captured */
   defaultParams?: UtmParameters
 
@@ -265,6 +297,7 @@ export interface ResolvedUtmConfig {
   captureOnMount: boolean
   appendToShares: boolean
   allowedParameters: string[]
+  lowercaseValues: boolean
   defaultParams: UtmParameters
   shareContextParams: ShareContextParams
   excludeFromShares: string[]

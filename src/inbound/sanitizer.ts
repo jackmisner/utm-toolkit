@@ -10,7 +10,8 @@ import type { SanitizeConfig, UtmParameters } from '../types'
 /**
  * Sanitize a single UTM parameter value
  *
- * Applies stripping rules in order: HTML chars → control chars → custom pattern → trim → truncate.
+ * Applies rules in order: HTML chars → control chars → custom pattern → trim →
+ * value pattern gate → maxLength handling.
  *
  * @param value - The raw parameter value
  * @param config - Sanitization configuration
@@ -40,8 +41,19 @@ export function sanitizeValue(value: string, config: SanitizeConfig): string {
 
   result = result.trim()
 
+  // Gate on the trimmed value. Testing before the trim would reject values whose
+  // only offence is surrounding whitespace that this function was about to remove.
+  if (config.valuePattern) {
+    config.valuePattern.lastIndex = 0
+    if (!config.valuePattern.test(result)) {
+      return ''
+    }
+  }
+
   if (result.length > config.maxLength) {
-    result = result.slice(0, config.maxLength)
+    // '' rather than removing the key: hasUtmParameters already treats '' as
+    // absent, so it is the established sentinel for "no value".
+    result = config.onMaxLength === 'drop' ? '' : result.slice(0, config.maxLength)
   }
 
   return result

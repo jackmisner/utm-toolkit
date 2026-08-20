@@ -27,3 +27,7 @@ jobs:
     needs: format
     uses: ./.github/workflows/ci-node22.yml
     secrets: inherit
+
+  test-node24:
+    needs: format
+    uses: ./.github/workflows/ci-node24.yml

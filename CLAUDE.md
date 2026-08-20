@@ -19,6 +19,13 @@
 
 Releases are done via `npm run release:patch|minor|major` which creates a `release/<version>` branch from main. Pushing the tag triggers the publish workflow.
 
+## Dependency Updates
+
+Dependabot runs weekly (`.github/dependabot.yml`). Minor/patch npm bumps arrive as one grouped PR; majors get individual PRs. Two things to know:
+
+- **React majors are ignored on purpose.** Which React line the tests run against is a support-matrix decision tied to the `peerDependencies: react >=16.8.0` claim, so it gets changed deliberately rather than by a weekly bump.
+- **oxlint does not run on Node 18.** Its native bindings require Node `^20.19.0 || >=22.12.0`, so npm skips installing them and oxlint fails with `Cannot find module './oxlint.linux-x64-gnu.node'`. `ci-node18.yml` therefore has no lint step — lint runs on the Node 20 and 22 jobs only. Do not "fix" this by pinning oxlint back; linting the same source once is enough, and the Node 18 job exists to prove the library runs there, not to re-lint it.
+
 ## Test Setup
 
 `__tests__/setup.ts` mocks `sessionStorage` and `window.location` globally before each test. Tests that need specific URLs must override `location.href` and `location.search`.

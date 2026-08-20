@@ -39,6 +39,18 @@ A comprehensive TypeScript library for capturing, storing, and appending UTM tra
 npm install @jackmisner/utm-toolkit
 ```
 
+**Requires Node.js >= 20.** The published bundle has no Node-version-specific code, but the test toolchain does, so CI exercises Node 22, 24 and 26 only — nothing below 22 is verified. React is an optional peer dependency (`>=16.8.0`); the core library works without it.
+
+Three entry points:
+
+| Import | Contents |
+|---|---|
+| `@jackmisner/utm-toolkit` | Capture, sanitize, PII filtering, storage, outbound links |
+| `@jackmisner/utm-toolkit/react` | Hook, provider and components (needs React) |
+| `@jackmisner/utm-toolkit/server` | DOM-free normalization for ingest endpoints |
+
+All three ship dual ESM/CJS builds with TypeScript declarations.
+
 ## Quick Start
 
 ### Basic Usage (Framework-Agnostic)
@@ -133,9 +145,28 @@ const params = captureUtmParameters(url, {
     stripHtml: true,        // Remove < > " ' ` (default: true)
     stripControlChars: true, // Remove control characters (default: true)
     maxLength: 200,          // Truncate values (default: 200)
+    onMaxLength: 'truncate', // or 'drop' to discard an over-length value
+    valuePattern: /^[a-z0-9_-]+$/, // Gate: values not matching become ''
   },
 });
+
+// Fold values so LinkedIn and linkedin are one campaign.
+// Runs before the sanitize and PII gates, so their patterns see folded input.
+const params = captureUtmParameters(url, { lowercaseValues: true });
 ```
+
+#### `captureUtmParametersWithReport(url?, options?)`
+
+Same pipeline as `captureUtmParameters`, but reports what was discarded. Use it when `{}` needs to mean something more specific than "no campaign" — see [Telling "No Campaign" Apart From "Campaign Rejected"](#telling-no-campaign-apart-from-campaign-rejected).
+
+```typescript
+const { params, rejected, invalidUrl } = captureUtmParametersWithReport(url, {
+  piiFiltering: { enabled: true },
+});
+// rejected: [{ key: 'utm_source', reason: 'pii', patternName: 'email' }]
+```
+
+`captureUtmParameters` delegates to this and returns `.params`, so the two cannot drift apart.
 
 #### `storeUtmParameters(params, options?)`
 
@@ -877,14 +908,39 @@ import type {
   TouchType,
   ValidationResult,
   UseUtmTrackingReturn,
+
+  // Capture reporting
+  CaptureReport,
+  UtmRejection,
+  UtmRejectionReason,
+  SanitizeRejection,
+  SanitizeValueResult,
+  PiiRejection,
+  FilterValueResult,
 } from '@jackmisner/utm-toolkit';
+
+// Server entry point
+import type {
+  ServerNormalizeOptions,
+  ServerNormalizeResult,
+  UtmRejection,
+  UtmRejectionReason,
+} from '@jackmisner/utm-toolkit/server';
 ```
 
-## Browser Support
+## Platform Support
+
+**Browsers**
 
 - All modern browsers (Chrome, Firefox, Safari, Edge)
-- Requires `sessionStorage` or `localStorage` support
-- SSR-safe (returns empty/null values on server)
+- Storage helpers require `sessionStorage` or `localStorage`; capture and outbound link building do not
+- SSR-safe (returns empty/null values on the server)
+
+**Node.js**
+
+- `engines.node` is `>=20.0.0`; CI exercises 22, 24 and 26
+- The root entry is DOM-free at runtime — every `window` access sits behind a guard — so it imports and runs in Node without a DOM
+- `@jackmisner/utm-toolkit/server` is the supported surface for server use: it cannot reach storage or the DOM, and that restriction is enforced by a test rather than only documented
 
 ## Migration from Existing Projects
 

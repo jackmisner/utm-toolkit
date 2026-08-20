@@ -79,6 +79,112 @@ describe('normalizeUtmParams', () => {
       expect(Object.keys(params).sort()).toEqual([...ALL_KEYS].sort())
     })
 
+    // JSON.parse cannot produce these, but "untrusted HTTP body" reaches this
+    // function through custom content parsers, ORM entities and framework
+    // reactive proxies too. The docblock promises any input, so it must mean it.
+    describe('exotic objects', () => {
+      it('does not throw on a throwing getter', () => {
+        const body = {}
+        Object.defineProperty(body, 'utm_source', {
+          get() {
+            throw new Error('hostile getter')
+          },
+          enumerable: true,
+          configurable: true,
+        })
+        expect(() => normalizeUtmParams(body)).not.toThrow()
+      })
+
+      it('treats a throwing getter as absent', () => {
+        const body = {}
+        Object.defineProperty(body, 'utm_source', {
+          get() {
+            throw new Error('hostile getter')
+          },
+          enumerable: true,
+          configurable: true,
+        })
+        const { params } = normalizeUtmParams(body)
+        expect(params.utm_source).toBe('')
+        expect(Object.keys(params).sort()).toEqual([...ALL_KEYS].sort())
+      })
+
+      it('does not throw on a proxy with a hostile trap', () => {
+        const hostile = new Proxy(
+          {},
+          {
+            getOwnPropertyDescriptor() {
+              throw new Error('hostile trap')
+            },
+            get() {
+              throw new Error('hostile trap')
+            },
+          },
+        )
+        expect(() => normalizeUtmParams(hostile)).not.toThrow()
+      })
+
+      it('does not throw on a revoked proxy', () => {
+        const { proxy, revoke } = Proxy.revocable({}, {})
+        revoke()
+        expect(() => normalizeUtmParams(proxy)).not.toThrow()
+      })
+
+      it('returns a total result for a revoked proxy', () => {
+        const { proxy, revoke } = Proxy.revocable({}, {})
+        revoke()
+        const { params } = normalizeUtmParams(proxy)
+        expect(Object.keys(params).sort()).toEqual([...ALL_KEYS].sort())
+      })
+    })
+
+    describe('malformed options', () => {
+      it('does not throw when a PII pattern entry has no regex', () => {
+        expect(() =>
+          normalizeUtmParams(
+            { utm_source: 'x' },
+            { piiFiltering: { patterns: [{ name: 'broken', enabled: true } as unknown as never] } },
+          ),
+        ).not.toThrow()
+      })
+
+      it('does not throw when valuePattern is not a RegExp', () => {
+        expect(() =>
+          normalizeUtmParams({ utm_source: 'x' }, { valuePattern: 42 as unknown as RegExp }),
+        ).not.toThrow()
+      })
+
+      it('stays total when a key fails to process', () => {
+        const { params } = normalizeUtmParams(
+          { utm_source: 'x' },
+          { piiFiltering: { patterns: [{ name: 'broken', enabled: true } as unknown as never] } },
+        )
+        expect(Object.keys(params).sort()).toEqual([...ALL_KEYS].sort())
+      })
+
+      it.each([
+        ['null', null],
+        ['a number', 42],
+        ['a string', 'utm_source'],
+        ['an object', {}],
+      ])('falls back to the standard keys when allowedParameters is %s', (_name, bad) => {
+        const { params } = normalizeUtmParams(
+          { utm_source: 'linkedin' },
+          { allowedParameters: bad as unknown as string[] },
+        )
+        expect(Object.keys(params).sort()).toEqual([...ALL_KEYS].sort())
+        expect(params.utm_source).toBe('linkedin')
+      })
+
+      it('ignores non-string entries inside allowedParameters', () => {
+        const { params } = normalizeUtmParams(
+          { utm_source: 'linkedin' },
+          { allowedParameters: ['utm_source', 42 as unknown as string] },
+        )
+        expect(Object.keys(params)).toEqual(['utm_source'])
+      })
+    })
+
     it('does not pollute Object.prototype', () => {
       normalizeUtmParams(JSON.parse('{"__proto__":{"polluted":true}}'))
       expect(({} as Record<string, unknown>).polluted).toBeUndefined()
@@ -154,6 +260,15 @@ describe('normalizeUtmParams', () => {
       )
       expect(params.utm_source).toBe('')
       expect(rejected).toEqual([{ key: 'utm_source', reason: 'valuePattern' }])
+    })
+
+    it('reports allowlist when piiFiltering.allowlistPattern rejects a value', () => {
+      const { params, rejected } = normalizeUtmParams(
+        { utm_source: 'has spaces' },
+        { piiFiltering: { allowlistPattern: /^[a-z]+$/ } },
+      )
+      expect(params.utm_source).toBe('')
+      expect(rejected).toEqual([{ key: 'utm_source', reason: 'allowlist' }])
     })
 
     it('can have PII filtering disabled', () => {

@@ -147,6 +147,38 @@ describe('loadConfigFromJson', () => {
 })
 
 describe('validateConfig', () => {
+  it('rejects a non-boolean lowercaseValues', () => {
+    const errors = validateConfig({ lowercaseValues: 'yes' as unknown as boolean })
+    expect(errors.some((e) => e.includes('lowercaseValues'))).toBe(true)
+  })
+
+  it('accepts a boolean lowercaseValues', () => {
+    expect(validateConfig({ lowercaseValues: true })).toEqual([])
+  })
+
+  it('rejects an unknown sanitize.onMaxLength', () => {
+    const errors = validateConfig({
+      sanitize: { onMaxLength: 'trunkate' as unknown as 'truncate' },
+    })
+    expect(errors.some((e) => e.includes('onMaxLength'))).toBe(true)
+  })
+
+  it('accepts valid sanitize.onMaxLength values', () => {
+    expect(validateConfig({ sanitize: { onMaxLength: 'drop' } })).toEqual([])
+    expect(validateConfig({ sanitize: { onMaxLength: 'truncate' } })).toEqual([])
+  })
+
+  it('rejects a non-RegExp sanitize.valuePattern', () => {
+    const errors = validateConfig({
+      sanitize: { valuePattern: '^[a-z]+$' as unknown as RegExp },
+    })
+    expect(errors.some((e) => e.includes('valuePattern'))).toBe(true)
+  })
+
+  it('accepts a RegExp sanitize.valuePattern', () => {
+    expect(validateConfig({ sanitize: { valuePattern: /^[a-z]+$/ } })).toEqual([])
+  })
+
   it('returns empty array for valid config', () => {
     const errors = validateConfig({
       enabled: true,
@@ -248,6 +280,41 @@ describe('sanitize config', () => {
       maxLength: 200,
       onMaxLength: 'truncate',
     })
+  })
+
+  it('createConfig carries onMaxLength through', () => {
+    const config = createConfig({ sanitize: { enabled: true, onMaxLength: 'drop' } })
+    expect(config.sanitize.onMaxLength).toBe('drop')
+  })
+
+  it('createConfig carries valuePattern through', () => {
+    const pattern = /^[a-z]+$/
+    const config = createConfig({ sanitize: { enabled: true, valuePattern: pattern } })
+    expect(config.sanitize.valuePattern).toBe(pattern)
+  })
+
+  it('createConfig({}) still resolves the onMaxLength default', () => {
+    // createConfig() with no argument early-returns the defaults without going
+    // through the merge, so it cannot catch a field the merge forgets to copy.
+    expect(createConfig({}).sanitize.onMaxLength).toBe('truncate')
+  })
+
+  it('createConfig keeps the onMaxLength default when other sanitize fields are set', () => {
+    const config = createConfig({ sanitize: { enabled: true } })
+    expect(config.sanitize.onMaxLength).toBe('truncate')
+  })
+
+  it('mergeConfig carries onMaxLength and valuePattern through', () => {
+    const pattern = /^[a-z]+$/
+    const base = createConfig({ sanitize: { enabled: true } })
+    const merged = mergeConfig(base, { sanitize: { onMaxLength: 'drop', valuePattern: pattern } })
+    expect(merged.sanitize.onMaxLength).toBe('drop')
+    expect(merged.sanitize.valuePattern).toBe(pattern)
+  })
+
+  it('createConfig carries lowercaseValues through', () => {
+    expect(createConfig({ lowercaseValues: true }).lowercaseValues).toBe(true)
+    expect(createConfig({}).lowercaseValues).toBe(false)
   })
 
   it('createConfig merges partial sanitize config with defaults', () => {

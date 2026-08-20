@@ -387,6 +387,8 @@ Rejection reasons are `'allowedParameters'`, `'valuePattern'`, `'maxLength'`, `'
 
 > **The report deliberately omits the rejected value.** It carries the key, the reason, and for PII the matching pattern name — nothing else. A report struct containing the raw value would be handed straight to a logger by most consumers, which is exactly what PII filtering exists to prevent.
 
+> **But the `key` is not sanitized.** Any `utm_`-prefixed query parameter is captured, so the key comes straight from the URL and an attacker controls it — `?utm_someone@example.com=1` produces a rejection whose `key` contains an email address. `rejected` is also unbounded, one entry per offending parameter. Treat the report as untrusted input before logging it: filter to the keys you expect, and cap the length.
+
 `captureUtmParameters` delegates to this function and returns `.params`, so the two can never drift apart.
 
 ### Sending Captured Params to a Server
@@ -776,7 +778,7 @@ installDebugHelpers();
 ```typescript
 import { normalizeUtmParams } from '@jackmisner/utm-toolkit/server';
 
-app.post('/api/utm', (req, res) => {
+app.post('/api/utm', async (req, res) => {
   const { params, rejected } = normalizeUtmParams(req.body);
 
   // params is TOTAL: every allowed key is present, absent ones are ''
@@ -817,7 +819,7 @@ The browser defaults are lenient because losing a campaign label client-side is 
 
 `/server` does not import storage, form population, link decoration, debug helpers or React. That restriction is enforced by a test that walks the module's runtime import graph, not just documented — so the guarantee cannot be quietly removed by a convenient re-export.
 
-Note the honest framing: the root entry does **not** crash in Node. The reasons to use `/server` are the documented DOM-free surface, the server-appropriate defaults, the totality contract, and a smaller install/parse surface — the server bundle is roughly 8KB against the root entry's 52KB.
+Note the honest framing: the root entry does **not** crash in Node. The reasons to use `/server` are the documented DOM-free surface, the server-appropriate defaults, the totality contract, and a smaller install/parse surface — the server bundle is roughly 5KB against the root entry's 52KB.
 
 ## Configuration Options
 

@@ -140,35 +140,101 @@ describe('captureUtmParametersWithReport', () => {
     })
   })
 
-  describe('captureUtmParameters delegates without changing behaviour', () => {
-    const cases: Array<[string, string, Parameters<typeof captureUtmParameters>[1]]> = [
-      ['plain capture', 'https://example.com?utm_source=linkedin', undefined],
-      ['camelCase keys', 'https://example.com?utm_source=linkedin', { keyFormat: 'camelCase' }],
+  describe('captureUtmParameters produces the documented results', () => {
+    // Golden values, NOT a comparison against captureUtmParametersWithReport.
+    // captureUtmParameters IS `captureUtmParametersWithReport(...).params`, so
+    // comparing the two asserts x === x and passes against any pipeline, however
+    // wrong. Every expectation below was taken from the pre-refactor
+    // implementation on main, so it pins behaviour rather than self-consistency.
+    const cases: Array<
+      [string, string, Parameters<typeof captureUtmParameters>[1], Record<string, string>]
+    > = [
+      [
+        'plain capture',
+        'https://example.com?utm_source=linkedin',
+        undefined,
+        { utm_source: 'linkedin' },
+      ],
+      [
+        'camelCase keys',
+        'https://example.com?utm_source=linkedin',
+        { keyFormat: 'camelCase' },
+        { utmSource: 'linkedin' },
+      ],
       [
         'allowlist filtering',
         'https://example.com?utm_source=a&utm_term=b',
         { allowedParameters: ['utm_source'] },
+        { utm_source: 'a' },
       ],
       [
         'sanitisation',
         'https://example.com?utm_source=%3Cb%3Ebold%3C%2Fb%3E',
         { sanitize: { enabled: true } },
+        { utm_source: 'bbold/b' },
       ],
       [
-        'pii filtering',
+        'pii filtering rejects the key',
         `https://example.com?utm_source=${encodeURIComponent(EMAIL)}`,
         { piiFiltering: { enabled: true } },
+        {},
       ],
-      ['lowercasing', 'https://example.com?utm_source=LinkedIn', { lowercaseValues: true }],
-      ['no utm params', 'https://example.com/page', undefined],
-      ['malformed url', 'not a url', undefined],
+      [
+        'pii redact mode keeps the key',
+        `https://example.com?utm_source=${encodeURIComponent(EMAIL)}`,
+        { piiFiltering: { enabled: true, mode: 'redact' } },
+        { utm_source: '[REDACTED]' },
+      ],
+      [
+        'lowercasing',
+        'https://example.com?utm_source=LinkedIn',
+        { lowercaseValues: true },
+        { utm_source: 'linkedin' },
+      ],
+      [
+        'duplicate, last wins',
+        'https://example.com?utm_source=a&utm_source=b',
+        undefined,
+        { utm_source: 'b' },
+      ],
+      [
+        'duplicate whose last occurrence is PII takes the key with it',
+        `https://example.com?utm_source=good&utm_source=${encodeURIComponent(EMAIL)}`,
+        { piiFiltering: { enabled: true } },
+        {},
+      ],
+      [
+        'duplicate whose first occurrence is PII keeps the last',
+        `https://example.com?utm_source=${encodeURIComponent(EMAIL)}&utm_source=good`,
+        { piiFiltering: { enabled: true } },
+        { utm_source: 'good' },
+      ],
+      [
+        'sanitize gate leaves an empty string',
+        'https://example.com?utm_source=BAD',
+        { sanitize: { enabled: true, valuePattern: /^[a-z]+$/ } },
+        { utm_source: '' },
+      ],
+      [
+        'non-utm params ignored',
+        'https://example.com?foo=bar&utm_source=x',
+        undefined,
+        { utm_source: 'x' },
+      ],
+      ['no utm params', 'https://example.com/page', undefined, {}],
+      ['malformed url', 'not a url', undefined, {}],
     ]
 
-    it.each(cases)('matches captureUtmParameters for %s', (_name, url, options) => {
-      expect(captureUtmParameters(url, options)).toEqual(
-        captureUtmParametersWithReport(url, options).params,
-      )
+    it.each(cases)('%s', (_name, url, options, expected) => {
+      expect(captureUtmParameters(url, options)).toEqual(expected)
     })
+
+    it.each(cases)(
+      'the report carries the same params for: %s',
+      (_name, url, options, expected) => {
+        expect(captureUtmParametersWithReport(url, options).params).toEqual(expected)
+      },
+    )
   })
 
   describe('callbacks', () => {

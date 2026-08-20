@@ -32,10 +32,18 @@ export function getDiagnostics(config?: ResolvedUtmConfig): DiagnosticInfo {
   const currentUrl = isBrowser ? window.location.href : ''
 
   // Capture params from current URL
+  // Forward the whole capture-shaping config, not just keys. Diagnostics that
+  // skip sanitisation, PII filtering or folding report a value no real pipeline
+  // produced, which makes this tool the cause of the confusion it exists to
+  // resolve. onCapture is deliberately NOT forwarded: inspecting state must not
+  // fire a consumer's side effects.
   const urlParams = isBrowser
     ? captureUtmParameters(currentUrl, {
         keyFormat: resolvedConfig.keyFormat,
         allowedParameters: resolvedConfig.allowedParameters,
+        lowercaseValues: resolvedConfig.lowercaseValues,
+        sanitize: resolvedConfig.sanitize,
+        piiFiltering: resolvedConfig.piiFiltering,
       })
     : {}
 

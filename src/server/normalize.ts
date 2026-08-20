@@ -105,7 +105,33 @@ export interface ServerNormalizeResult {
  * one would silently read numeric indices as keys.
  */
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  try {
+    return !Array.isArray(value)
+  } catch {
+    // Array.isArray throws on a revoked Proxy. Anything we cannot even classify
+    // is not a usable parameter map.
+    return false
+  }
+}
+
+/**
+ * Read one property from an untrusted object, treating any failure as absence.
+ *
+ * `source[key]` runs a getter, and `hasOwnProperty` runs a Proxy trap; either
+ * can throw on a hostile or exotic object. `JSON.parse` cannot produce those,
+ * but this function is also reachable through custom content-type parsers, ORM
+ * entities and framework reactive proxies, and the never-throws guarantee is
+ * this module's headline promise.
+ */
+function readProperty(source: Record<string, unknown>, key: string): unknown {
+  try {
+    return Object.prototype.hasOwnProperty.call(source, key) ? source[key] : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -127,9 +153,10 @@ function setParam(params: Record<string, string>, key: string, value: string): v
 /**
  * Normalize UTM parameters from an untrusted request body
  *
- * Accepts input of any shape and never throws. Values that are not strings are
- * rejected rather than coerced — `String(['a','b'])` is `'a,b'`, a value nobody
- * sent.
+ * Accepts input of any shape and never throws — including objects with throwing
+ * getters and hostile or revoked Proxies, which are treated as absent. Values
+ * that are not strings are rejected rather than coerced: `String(['a','b'])` is
+ * `'a,b'`, a value nobody sent.
  *
  * @param input - An untrusted request body, of any shape
  * @param options - Normalisation options; see {@link ServerNormalizeOptions}
@@ -147,7 +174,6 @@ export function normalizeUtmParams(
   options: ServerNormalizeOptions = {},
 ): ServerNormalizeResult {
   const {
-    allowedParameters = [...STANDARD_UTM_PARAMETERS],
     maxLength = 200,
     onMaxLength = 'drop',
     lowercase = true,
@@ -174,6 +200,15 @@ export function normalizeUtmParams(
     mode: 'reject',
   }
 
+  // Server config often arrives from env or JSON, so allowedParameters cannot be
+  // trusted to be an array of strings. A non-array falls back to the standard
+  // keys; a string would otherwise be iterated character by character, producing
+  // one column per letter.
+  const allowedParameters =
+    Array.isArray(options.allowedParameters) && options.allowedParameters.length > 0
+      ? options.allowedParameters.filter((key): key is string => typeof key === 'string')
+      : [...STANDARD_UTM_PARAMETERS]
+
   const rejected: UtmRejection[] = []
   const params: Record<string, string> = {}
   const source = isPlainRecord(input) ? input : {}
@@ -182,7 +217,7 @@ export function normalizeUtmParams(
   // prototype pollution in one move: a key the caller did not allow can never
   // become an output key, whatever the body contains.
   for (const key of allowedParameters) {
-    const raw = Object.prototype.hasOwnProperty.call(source, key) ? source[key] : undefined
+    const raw = readProperty(source, key)
 
     if (raw === undefined || raw === null) {
       setParam(params, key, absentValue)
@@ -199,14 +234,24 @@ export function normalizeUtmParams(
     // toLowerCase(), never toLocaleLowerCase(): folding must not depend on locale.
     const folded = lowercase ? raw.toLowerCase() : raw
 
-    const sanitized = sanitizeValueWithReport(folded, sanitizeConfig)
-    if (sanitized.rejected) {
+    let sanitized: ReturnType<typeof sanitizeValueWithReport>
+    let filtered: ReturnType<typeof filterValueWithReport>
+    try {
+      sanitized = sanitizeValueWithReport(folded, sanitizeConfig)
+      if (sanitized.rejected) {
+        setParam(params, key, absentValue)
+        rejected.push({ key, reason: sanitized.rejected })
+        continue
+      }
+      filtered = filterValueWithReport(key, sanitized.value, piiConfig)
+    } catch {
+      // A malformed caller-supplied regex or PII pattern is a config bug. Degrade
+      // this key to absent rather than 500 the request, and keep the output total.
       setParam(params, key, absentValue)
-      rejected.push({ key, reason: sanitized.rejected })
+      rejected.push({ key, reason: 'notAString' })
       continue
     }
 
-    const filtered = filterValueWithReport(key, sanitized.value, piiConfig)
     if (filtered.rejected) {
       setParam(params, key, absentValue)
       rejected.push({

@@ -230,6 +230,98 @@ describe('sanitization integration', () => {
   })
 })
 
+describe('duplicate query parameters', () => {
+  // URLSearchParams yields every occurrence. Capture is last-wins, and a
+  // rejected last occurrence must not resurrect an earlier accepted one —
+  // otherwise a link carrying `?utm_source=good&utm_source=<pii>` smuggles a
+  // value past the filter.
+  it('is last-wins for plain duplicates', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=a&utm_source=b')
+    expect(result.utm_source).toBe('b')
+  })
+
+  it('drops the key when the LAST duplicate is rejected as PII', () => {
+    const result = captureUtmParameters(
+      'https://example.com?utm_source=good&utm_source=a%40b.com',
+      { piiFiltering: { enabled: true } },
+    )
+    expect(result).toEqual({})
+  })
+
+  it('keeps the last duplicate when an EARLIER one is rejected as PII', () => {
+    const result = captureUtmParameters(
+      'https://example.com?utm_source=a%40b.com&utm_source=good',
+      { piiFiltering: { enabled: true } },
+    )
+    expect(result).toEqual({ utm_source: 'good' })
+  })
+
+  it('drops the key when the last duplicate fails the PII allowlist', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=good&utm_source=BAD', {
+      piiFiltering: { enabled: true, allowlistPattern: /^[a-z]+$/ },
+    })
+    expect(result).toEqual({})
+  })
+
+  it('is last-wins when the last duplicate is dropped by a sanitize gate', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=good&utm_source=BAD', {
+      sanitize: { enabled: true, valuePattern: /^[a-z]+$/ },
+    })
+    expect(result.utm_source).toBe('')
+  })
+})
+
+describe('malformed configuration does not break the caller', () => {
+  // The pipeline runs on a page-load path. A misconfigured pattern is a
+  // consumer bug, but throwing out of capture turns it into a broken page.
+  it('returns empty when a PII pattern entry has no regex', () => {
+    const result = captureUtmParameters('https://example.com?utm_source=x', {
+      piiFiltering: {
+        enabled: true,
+        patterns: [{ name: 'broken', enabled: true } as unknown as never],
+      },
+    })
+    expect(result).toEqual({})
+  })
+
+  it('does not throw when customPattern is not a RegExp', () => {
+    expect(() =>
+      captureUtmParameters('https://example.com?utm_source=x', {
+        sanitize: { enabled: true, customPattern: 'abc' as unknown as RegExp },
+      }),
+    ).not.toThrow()
+  })
+
+  it('does not throw when valuePattern is not a RegExp', () => {
+    expect(() =>
+      captureUtmParameters('https://example.com?utm_source=x', {
+        sanitize: { enabled: true, valuePattern: 42 as unknown as RegExp },
+      }),
+    ).not.toThrow()
+  })
+})
+
+describe('onPiiDetected call parity', () => {
+  // The callback receives the RAW value, which the docblock says must never be
+  // logged. Firing it for a duplicate occurrence that never reaches the output
+  // hands consumers strictly more raw PII than before.
+  it('does not fire for a superseded duplicate occurrence', () => {
+    const calls: string[] = []
+    captureUtmParameters('https://example.com?utm_source=someone%40example.com&utm_source=clean', {
+      piiFiltering: { enabled: true, onPiiDetected: (key) => calls.push(key) },
+    })
+    expect(calls).toEqual([])
+  })
+
+  it('fires once for a surviving rejected value', () => {
+    const calls: string[] = []
+    captureUtmParameters('https://example.com?utm_source=someone%40example.com', {
+      piiFiltering: { enabled: true, onPiiDetected: (key) => calls.push(key) },
+    })
+    expect(calls).toEqual(['utm_source'])
+  })
+})
+
 describe('lowercaseValues', () => {
   it('does not lowercase by default, preserving current behaviour', () => {
     const result = captureUtmParameters('https://example.com?utm_source=LinkedIn')

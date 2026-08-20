@@ -56,7 +56,9 @@ function mergeSanitizeConfig(
     stripHtml: override.stripHtml ?? base.stripHtml,
     stripControlChars: override.stripControlChars ?? base.stripControlChars,
     maxLength: override.maxLength ?? base.maxLength,
+    onMaxLength: override.onMaxLength ?? base.onMaxLength,
     customPattern: override.customPattern ?? base.customPattern,
+    valuePattern: override.valuePattern ?? base.valuePattern,
   }
 }
 
@@ -277,6 +279,10 @@ export function validateConfig(config: unknown): string[] {
     errors.push('appendToShares must be a boolean')
   }
 
+  if (c.lowercaseValues !== undefined && typeof c.lowercaseValues !== 'boolean') {
+    errors.push('lowercaseValues must be a boolean')
+  }
+
   if (c.allowedParameters !== undefined) {
     if (!Array.isArray(c.allowedParameters)) {
       errors.push('allowedParameters must be an array')
@@ -333,6 +339,12 @@ export function validateConfig(config: unknown): string[] {
       }
       if (s.customPattern !== undefined && !(s.customPattern instanceof RegExp)) {
         errors.push('sanitize.customPattern must be a RegExp')
+      }
+      if (s.valuePattern !== undefined && !(s.valuePattern instanceof RegExp)) {
+        errors.push('sanitize.valuePattern must be a RegExp')
+      }
+      if (s.onMaxLength !== undefined && s.onMaxLength !== 'truncate' && s.onMaxLength !== 'drop') {
+        errors.push('sanitize.onMaxLength must be "truncate" or "drop"')
       }
     }
   }

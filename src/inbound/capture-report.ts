@@ -42,7 +42,14 @@ export type UtmRejectionReason =
  * handed straight to a logger by most consumers who use it.
  */
 export interface UtmRejection {
-  /** The parameter key, e.g. 'utm_content' */
+  /**
+   * The parameter key, e.g. 'utm_content'.
+   *
+   * UNTRUSTED. Any `utm_`-prefixed query parameter is captured, so this comes
+   * straight from the URL and an attacker controls it — `?utm_someone@example.com=1`
+   * yields a rejection whose key contains an email address. Filter to the keys
+   * you expect before logging a report.
+   */
   key: string
 
   /** Why the parameter was discarded */
@@ -59,7 +66,12 @@ export interface CaptureReport {
   /** The parameters that survived the pipeline */
   params: UtmParameters
 
-  /** Every parameter discarded during capture, in pipeline order */
+  /**
+   * Every parameter discarded during capture, in pipeline order.
+   *
+   * Unbounded: a URL carrying 500 offending parameters produces 500 entries.
+   * Cap it before logging or emitting metrics keyed on its contents.
+   */
   rejected: UtmRejection[]
 
   /**
@@ -147,65 +159,96 @@ export function captureUtmParametersWithReport(
   const allowedSet =
     allowedParameters && allowedParameters.length > 0 ? new Set(allowedParameters) : null
 
-  const captured: Record<string, string> = {}
+  // Everything past the URL parse runs inside one guard. A malformed
+  // caller-supplied regex or PII pattern is a consumer bug, but capture runs on
+  // a page-load path, so it must degrade to "no parameters" rather than throw —
+  // the behaviour the pre-refactor implementation had, and callers rely on.
+  try {
+    // PHASE 1: collect, last-wins. Duplicated query parameters must resolve
+    // BEFORE the gates run, so that a rejected later occurrence takes the key
+    // with it rather than leaving an earlier accepted duplicate standing, and so
+    // that onPiiDetected fires only for the value that actually survives.
+    const collected: Record<string, string> = {}
+    const reportedKeys = new Set<string>()
 
-  for (const [key, rawValue] of urlObj.searchParams.entries()) {
-    // Only capture parameters that start with 'utm_' (case-sensitive)
-    if (!isSnakeCaseUtmKey(key)) {
-      continue
-    }
-
-    if (allowedSet !== null && !allowedSet.has(key)) {
-      rejected.push({ key, reason: 'allowedParameters' })
-      continue
-    }
-
-    // Fold before every gate below, so patterns can assume lowercase input.
-    // toLowerCase(), never toLocaleLowerCase(): folding must not depend on locale.
-    let value = lowercaseValues ? rawValue.toLowerCase() : rawValue
-
-    if (resolvedSanitize.enabled) {
-      const result = sanitizeValueWithReport(value, resolvedSanitize)
-      if (result.rejected) {
-        rejected.push({ key, reason: result.rejected })
-      }
-      // The key stays, carrying ''. hasUtmParameters already treats '' as absent,
-      // so it is the established "no value" sentinel; dropping the key here would
-      // be a second, inconsistent one. (PII reject mode does drop the key — that
-      // is pre-existing behaviour and is preserved below.)
-      value = result.value
-    }
-
-    if (resolvedPiiFilter.enabled) {
-      const result = filterValueWithReport(key, value, resolvedPiiFilter)
-      if (result.rejected) {
-        rejected.push({ key, reason: result.rejected.reason, ...pattern(result.rejected) })
-      }
-      // In redact mode a rejected value survives as '[REDACTED]'; in reject mode
-      // it is undefined and the key is dropped.
-      if (result.value === undefined) {
+    for (const [key, rawValue] of urlObj.searchParams.entries()) {
+      // Only capture parameters that start with 'utm_' (case-sensitive)
+      if (!isSnakeCaseUtmKey(key)) {
         continue
       }
-      value = result.value
+
+      if (allowedSet !== null && !allowedSet.has(key)) {
+        // Report a disallowed key once, however many times it appears.
+        if (!reportedKeys.has(key)) {
+          reportedKeys.add(key)
+          rejected.push({ key, reason: 'allowedParameters' })
+        }
+        continue
+      }
+
+      // Fold before every gate below, so patterns can assume lowercase input.
+      // toLowerCase(), never toLocaleLowerCase(): folding must not depend on locale.
+      collected[key] = lowercaseValues ? rawValue.toLowerCase() : rawValue
     }
 
-    captured[key] = value
-  }
+    // PHASE 2: gate the surviving value for each key.
+    const captured: Record<string, string> = {}
 
-  const params: UtmParameters =
-    keyFormat === 'camelCase'
-      ? convertParams(captured as UtmParameters, 'camelCase')
-      : (captured as UtmParameters)
+    for (const [key, initialValue] of Object.entries(collected)) {
+      let value = initialValue
 
-  if (onCapture && Object.keys(params).length > 0) {
-    try {
-      onCapture(params)
-    } catch {
-      // Callbacks must not break the pipeline
+      if (resolvedSanitize.enabled) {
+        const result = sanitizeValueWithReport(value, resolvedSanitize)
+        if (result.rejected) {
+          rejected.push({ key, reason: result.rejected })
+        }
+        // The key stays, carrying ''. hasUtmParameters already treats '' as absent,
+        // so it is the established "no value" sentinel; dropping the key here would
+        // be a second, inconsistent one. (PII reject mode does drop the key — that
+        // is pre-existing behaviour and is preserved below.)
+        value = result.value
+      }
+
+      if (resolvedPiiFilter.enabled) {
+        const result = filterValueWithReport(key, value, resolvedPiiFilter)
+        if (result.rejected) {
+          rejected.push({ key, reason: result.rejected.reason, ...pattern(result.rejected) })
+        }
+        // In redact mode a rejected value survives as '[REDACTED]'; in reject mode
+        // it is undefined and the key is dropped entirely.
+        if (result.value === undefined) {
+          continue
+        }
+        value = result.value
+      }
+
+      captured[key] = value
     }
-  }
 
-  return { params, rejected, invalidUrl: false }
+    const params: UtmParameters =
+      keyFormat === 'camelCase'
+        ? convertParams(captured as UtmParameters, 'camelCase')
+        : (captured as UtmParameters)
+
+    if (onCapture && Object.keys(params).length > 0) {
+      try {
+        onCapture(params)
+      } catch {
+        // Callbacks must not break the pipeline
+      }
+    }
+
+    return { params, rejected, invalidUrl: false }
+  } catch (error) {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn(
+        'Failed to capture UTM parameters:',
+        error instanceof Error ? error.message : 'Unknown error',
+      )
+    }
+    // invalidUrl stays false: the URL parsed fine, the pipeline did not.
+    return { params: {}, rejected, invalidUrl: false }
+  }
 }
 
 /**

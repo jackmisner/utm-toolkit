@@ -31,3 +31,7 @@ jobs:
   test-node24:
     needs: format
     uses: ./.github/workflows/ci-node24.yml
+
+  test-node26:
+    needs: format
+    uses: ./.github/workflows/ci-node26.yml

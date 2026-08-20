@@ -26,15 +26,28 @@ capture.ts :: captureUtmParameters(url, options)   <-- thin wrapper, unchanged s
         |
         +--> capture-report.ts :: captureUtmParametersWithReport(url, options).params
 
-pipeline (per query parameter):
-  isSnakeCaseUtmKey -> allowedParameters -> lowercaseValues -> sanitize -> PII filter
-                                                                            |
-                            keyFormat conversion -> onCapture -> { params, rejected, invalidUrl }
+URL parse  --(throws)-->  { params: {}, rejected: [], invalidUrl: TRUE }
+        |
+        v   ......... everything below runs inside ONE try/catch .........
+  PHASE 1 (per query parameter, in URL order)
+    isSnakeCaseUtmKey -> allowedParameters -> lowercaseValues -> collected[key]
+        |                       |                                  LAST-WINS
+        |                       +-- rejected once per key (reportedKeys Set)
+        v
+  PHASE 2 (per surviving key, one value each)
+    sanitize -> PII filter -> captured[key]
+        |
+        v
+  keyFormat conversion -> onCapture -> { params, rejected, invalidUrl: false }
+        |
+        +--(any throw)--> console.warn, { params: {}, rejected, invalidUrl: FALSE }
 ```
 
 - `captureUtmParametersWithReport` returns `{ params, rejected, invalidUrl }`. It exists so a consumer can tell *"no campaign"* apart from *"campaign arrived and every parameter was filtered"* — collapsing the two inflates the direct-traffic denominator that every campaign share is measured against. `invalidUrl` is a third state again: an unparseable URL is neither.
+- **The two phases are ordered the way they are because duplicates must resolve before the gates run.** `?utm_source=good&utm_source=<pii>` has to yield `{}`: if each occurrence were gated as it was read, rejecting the later value would leave the earlier accepted `'good'` standing and a value would slip past the PII filter. Collecting last-wins first also means `onPiiDetected` — which receives the **raw** value — fires only for the value that actually survives, rather than for superseded occurrences, so a consumer is never handed raw PII for a value the pipeline discarded anyway.
+- A key blocked by `allowedParameters` is reported **once**, however many times it appears in the query string, tracked by a `reportedKeys` Set during phase 1.
 - `capture.ts` imports the runtime function from `capture-report.ts`; `capture-report.ts` imports the `CaptureOptions` **type** back from `capture.ts`. The back-edge is type-only, erased at build, so there is no runtime cycle.
-- Per-parameter processing (not batch `sanitizeParams`/`filterParams`) is what makes rejection attributable to a key.
+- Per-key processing (not batch `sanitizeParams`/`filterParams`) is what makes rejection attributable to a key.
 - `hasUtmParameters()` checks a `UtmParameters` object for any defined values, treating `''` as absent.
 
 **Sanitizer (`sanitizer.ts`)** cleans UTM parameter values. Rule order is:
@@ -73,6 +86,9 @@ pipeline (per query parameter):
 - **Reports never carry the rejected value.** `UtmRejection` holds a key, a reason, and for PII the pattern *name* only. `PiiFilterConfig.onPiiDetected` already warns that raw values must not be logged or transmitted, and a report struct carrying one would be handed straight to a logger by most consumers who use it. `patternName` is omitted entirely rather than set to `undefined`, so it does not surface in JSON.
 - **`lowercaseValues` is folded before every gate**, so `sanitize.customPattern`, `sanitize.valuePattern`, and `piiFiltering.allowlistPattern` can all be written assuming lowercase input. It uses `toLowerCase()`, never `toLocaleLowerCase()` — folding must not depend on locale. Keys are never folded. It lives on `CaptureOptions` rather than `SanitizeConfig` to mirror `BuildUtmUrlOptions.lowercaseValues` on the outbound side, which means it must also be threaded through `UtmConfig` in `@/src/config` for the React path.
 - **A value reduced to `''` by ordinary stripping is not a rejection.** That outcome predates the report; reporting it would hand every consumer spurious rejections from long-standing behaviour. Only the gates report.
-- **The single-pipeline invariant matters.** Any change to capture semantics belongs in `capture-report.ts`; `captureUtmParameters` cannot drift from it because it is a delegation, not a copy.
+- **Capture never throws, because it runs on a page-load path.** The whole pipeline past the URL parse sits inside one guard: a consumer's malformed regex or half-built PII pattern (a `PiiPattern` with `enabled: true` and no `regex`, say) degrades to "no parameters" plus a `console.warn`, not a broken page. Its equivalent on the server side is the per-key guard in `@/src/server/normalize.ts`, which degrades one key to `absentValue` rather than failing the request.
+- **`invalidUrl` means URL-parse failure specifically, not pipeline failure.** The pipeline guard returns `invalidUrl: false` — the URL parsed fine, the processing did not. A consumer branching on `invalidUrl` to decide "the caller handed us garbage" would be wrong to read it as "something went wrong".
+- **`UtmRejection.key` is attacker-controlled and `CaptureReport.rejected` is unbounded.** Any `utm_`-prefixed query parameter is captured, so `?utm_someone@example.com=1` produces a rejection whose *key* contains an email, and a URL carrying hundreds of offending parameters produces hundreds of entries. The report withholds rejected **values** but not untrusted **keys**; filter to expected keys and cap the array before logging one or emitting metrics keyed on its contents.
+- **The single-pipeline invariant matters.** Any change to capture semantics belongs in `capture-report.ts`; `captureUtmParameters` cannot drift from it because it is a delegation, not a copy. The flip side is that a test comparing the two proves nothing — see `@/__tests__/docs.md`.
 
 Created and maintained by Nori.

@@ -10,15 +10,53 @@ import type { SanitizeConfig, UtmParameters } from '../types'
 /**
  * Sanitize a single UTM parameter value
  *
- * Applies stripping rules in order: HTML chars → control chars → custom pattern → trim → truncate.
+ * Applies rules in order: HTML chars → control chars → custom pattern → trim →
+ * value pattern gate → maxLength handling.
  *
  * @param value - The raw parameter value
  * @param config - Sanitization configuration
  * @returns Sanitized value
  */
 export function sanitizeValue(value: string, config: SanitizeConfig): string {
+  return sanitizeValueWithReport(value, config).value
+}
+
+/**
+ * Why `sanitizeValue` discarded a value outright.
+ *
+ * Only covers the two gates that reject a whole value. A value reduced to `''`
+ * by ordinary stripping is not a rejection — that has always been possible and
+ * reporting it would hand every consumer spurious rejections from behaviour
+ * that predates the report.
+ */
+export type SanitizeRejection = 'maxLength' | 'valuePattern'
+
+/**
+ * Result of sanitizing a value, with the reason it was dropped if it was.
+ */
+export interface SanitizeValueResult {
+  /** The sanitized value, or `''` if a gate rejected it */
+  value: string
+  /** Set only when a gate rejected the value outright */
+  rejected?: SanitizeRejection
+}
+
+/**
+ * Sanitize a value and report which gate, if any, rejected it
+ *
+ * Same rules and ordering as {@link sanitizeValue}; this variant additionally
+ * distinguishes "dropped by a gate" from "reduced to empty by stripping".
+ *
+ * @param value - The raw parameter value
+ * @param config - Sanitization configuration
+ * @returns The sanitized value plus an optional rejection reason
+ */
+export function sanitizeValueWithReport(
+  value: string,
+  config: SanitizeConfig,
+): SanitizeValueResult {
   if (!config.enabled) {
-    return value
+    return { value }
   }
 
   let result = value
@@ -40,11 +78,25 @@ export function sanitizeValue(value: string, config: SanitizeConfig): string {
 
   result = result.trim()
 
+  // Gate on the trimmed value. Testing before the trim would reject values whose
+  // only offence is surrounding whitespace that this function was about to remove.
+  if (config.valuePattern) {
+    config.valuePattern.lastIndex = 0
+    if (!config.valuePattern.test(result)) {
+      return { value: '', rejected: 'valuePattern' }
+    }
+  }
+
   if (result.length > config.maxLength) {
+    // '' rather than removing the key: hasUtmParameters already treats '' as
+    // absent, so it is the established sentinel for "no value".
+    if (config.onMaxLength === 'drop') {
+      return { value: '', rejected: 'maxLength' }
+    }
     result = result.slice(0, config.maxLength)
   }
 
-  return result
+  return { value: result }
 }
 
 /**

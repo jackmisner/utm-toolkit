@@ -31,6 +31,7 @@ export const DEFAULT_SANITIZE_CONFIG: SanitizeConfig = {
   stripHtml: true,
   stripControlChars: true,
   maxLength: 200,
+  onMaxLength: 'truncate',
 }
 
 /**
@@ -106,6 +107,9 @@ export const DEFAULT_CONFIG: ResolvedUtmConfig = {
 
   /** Capture standard UTM parameters by default */
   allowedParameters: [...STANDARD_UTM_PARAMETERS],
+
+  /** Values are not folded to lowercase by default */
+  lowercaseValues: false,
 
   /** No default parameters set */
   defaultParams: {},

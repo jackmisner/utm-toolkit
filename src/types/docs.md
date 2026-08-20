@@ -24,12 +24,16 @@ Path: @/src/types
 - `ResolvedUtmConfig` mirrors `UtmConfig` but with all fields required (except `ttl` and event callbacks, which remain optional) -- it represents the result of merging user-provided partial config with defaults. Includes `storageType` (defaulting to `'session'`), optional `ttl` (milliseconds, only meaningful for localStorage), `attribution` config, and lifecycle callbacks (`onCapture`, `onStore`, `onClear`, `onAppend`, `onExpire`).
 - Event callback signatures on `UtmConfig`/`ResolvedUtmConfig`: `onCapture(params)`, `onStore(params, meta)` where meta includes `storageType` and optional `touch`, `onClear()`, `onAppend(url, params)`, `onExpire(storageKey)`.
 - `SanitizeConfig` and `PiiFilterConfig` follow the partial-in/resolved-out pattern: `Partial<>` on `UtmConfig` (user input), required on `ResolvedUtmConfig` (resolved output).
+- `SanitizeConfig` carries two distinct kinds of value rule. `customPattern` is **subtractive** (matches are stripped out of the value); `valuePattern` is a **positive allowlist gate** (the value is kept whole or replaced with `''`). `onMaxLength` (`'truncate' | 'drop'`) selects what happens to an over-length value — `'truncate'` is the default and preserves the original behaviour, `'drop'` is what a consumer keying a datastore wants, since a truncated value is one nobody sent.
+- `UtmConfig.lowercaseValues` (mirrored required on `ResolvedUtmConfig`) is a **flat** field rather than part of `SanitizeConfig`, deliberately mirroring `BuildUtmUrlOptions.lowercaseValues` on the outbound side. It is forwarded to `CaptureOptions.lowercaseValues` by the React path.
 
 ### Things to Know
 
 - `UtmParameters` is a union, not an intersection. Code that receives it must handle either format, typically by detecting the format or converting via `@/src/common/keys.ts`.
 - `SharePlatform` is `'linkedin' | 'twitter' | 'facebook' | 'copy' | string` -- the named platforms are documentation aids, but any string is accepted.
 - `DiagnosticInfo` is only used by `@/src/debug` and is meant for development-time inspection, not production data flow.
-- New features use a nested config object pattern (e.g., `sanitize: SanitizeConfig`, `attribution: AttributionConfig`) rather than adding flat fields to `UtmConfig`. The exceptions are `storageType`, `ttl`, and event callbacks, which exist as flat fields.
+- New features use a nested config object pattern (e.g., `sanitize: SanitizeConfig`, `attribution: AttributionConfig`) rather than adding flat fields to `UtmConfig`. The exceptions are `storageType`, `ttl`, event callbacks, and `lowercaseValues`, which exist as flat fields.
+- Rejection types (`UtmRejection`, `UtmRejectionReason`, `SanitizeRejection`, `PiiRejection`) are **not** defined here — they live next to the code that produces them in `@/src/inbound`, and `@/src/server` re-exports `UtmRejection` type-only so both entry points describe rejections with one vocabulary.
+- Server-side normalisation options (`ServerNormalizeOptions`) are also defined locally in `@/src/server`, not here, because they are a different contract from `UtmConfig` — they configure a stateless pure function, not a stateful browser session.
 
 Created and maintained by Nori.

@@ -112,6 +112,69 @@ describe('sanitizeValue', () => {
     })
   })
 
+  describe('onMaxLength', () => {
+    it('truncates by default, preserving current behaviour', () => {
+      const result = sanitizeValue('a'.repeat(250), defaultConfig)
+      expect(result).toBe('a'.repeat(200))
+    })
+
+    it('truncates when explicitly set to truncate', () => {
+      const config: SanitizeConfig = { ...defaultConfig, onMaxLength: 'truncate' }
+      const result = sanitizeValue('a'.repeat(250), config)
+      expect(result).toBe('a'.repeat(200))
+    })
+
+    it('drops the whole value when set to drop', () => {
+      const config: SanitizeConfig = { ...defaultConfig, onMaxLength: 'drop' }
+      const result = sanitizeValue('a'.repeat(250), config)
+      expect(result).toBe('')
+    })
+
+    it('leaves a value exactly at maxLength untouched under truncate', () => {
+      const config: SanitizeConfig = { ...defaultConfig, maxLength: 10, onMaxLength: 'truncate' }
+      expect(sanitizeValue('a'.repeat(10), config)).toBe('a'.repeat(10))
+    })
+
+    it('leaves a value exactly at maxLength untouched under drop', () => {
+      const config: SanitizeConfig = { ...defaultConfig, maxLength: 10, onMaxLength: 'drop' }
+      expect(sanitizeValue('a'.repeat(10), config)).toBe('a'.repeat(10))
+    })
+
+    it('drops a value one character over maxLength', () => {
+      const config: SanitizeConfig = { ...defaultConfig, maxLength: 10, onMaxLength: 'drop' }
+      expect(sanitizeValue('a'.repeat(11), config)).toBe('')
+    })
+  })
+
+  describe('valuePattern', () => {
+    it('keeps a value that matches the pattern', () => {
+      const config: SanitizeConfig = { ...defaultConfig, valuePattern: /^[a-z0-9_-]+$/ }
+      expect(sanitizeValue('spring-2025_campaign', config)).toBe('spring-2025_campaign')
+    })
+
+    it('drops a value that does not match the pattern', () => {
+      const config: SanitizeConfig = { ...defaultConfig, valuePattern: /^[a-z]+$/ }
+      expect(sanitizeValue('has spaces and 123', config)).toBe('')
+    })
+
+    it('is undefined by default, so any value survives', () => {
+      expect(sanitizeValue('anything at all !@#', defaultConfig)).toBe('anything at all !@#')
+    })
+
+    it('gives the same answer twice with a g-flagged pattern', () => {
+      const config: SanitizeConfig = { ...defaultConfig, valuePattern: /^[a-z]+$/g }
+      const first = sanitizeValue('linkedin', config)
+      const second = sanitizeValue('linkedin', config)
+      expect(first).toBe('linkedin')
+      expect(second).toBe(first)
+    })
+
+    it('tests the trimmed value, not the raw one', () => {
+      const config: SanitizeConfig = { ...defaultConfig, valuePattern: /^[a-z]+$/ }
+      expect(sanitizeValue('  linkedin  ', config)).toBe('linkedin')
+    })
+  })
+
   describe('edge cases', () => {
     it('returns empty string when everything is stripped', () => {
       const result = sanitizeValue('<>"\'`', defaultConfig)

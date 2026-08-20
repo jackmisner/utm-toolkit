@@ -5,31 +5,63 @@ Path: @/src/inbound
 ### Overview
 
 - Utilities for the inbound data path: receiving UTM-tagged traffic, processing captured parameters, and routing them into storage or form fields.
-- Includes URL capture, value sanitization, PII filtering, first-touch/last-touch attribution, and form field population.
+- Includes URL capture, capture rejection reporting, value sanitization, PII filtering, first-touch/last-touch attribution, and form field population.
 - All exports are re-exported through `@/src/index.ts` to package consumers.
 
 ### How it fits into the larger codebase
 
 - `@/src/react/useUtmTracking.ts` calls `captureUtmParameters` from this module during its mount-time capture flow.
 - `@/src/debug` imports `captureUtmParameters` to build diagnostic snapshots.
-- Attribution (`attribution.ts`) and form (`form.ts`) import storage functions from `@/src/common/storage`.
+- `@/src/server` reuses the *value-level* primitives here (`sanitizeValueWithReport`, `filterValueWithReport`) so server-side normalisation applies the same rules from the same code. It does not reuse the capture pipeline, which is URL-shaped and browser-defaulted. It also imports the `UtmRejection` type from `capture-report.ts` type-only, so server and browser rejections share one vocabulary without pulling browser-coupled code into the server bundle.
+- Attribution (`attribution.ts`) and form (`form.ts`) import storage functions from `@/src/common/storage`. These modules are on the forbidden list for `@/src/server` and are structurally unreachable from it.
 - Sanitizer and PII filter are invoked during capture when their respective config options are enabled. The config objects (`SanitizeConfig`, `PiiFilterConfig`) come from `@/src/types` and are resolved in `@/src/config`.
 - Types (`AttributionConfig`, `TouchType`, `AttributionMode`, `PiiPattern`, etc.) come from `@/src/types`.
 
 ### Core Implementation
 
-**Capture (`capture.ts`)** extracts UTM parameters from a URL string:
-- Parses the URL via the `URL` constructor, iterates `searchParams`, and filters to allowed parameter names.
-- Applies value sanitization (if `sanitize.enabled`) and PII filtering (if `piiFiltering.enabled`) as part of the capture pipeline.
-- `hasUtmParameters()` checks a `UtmParameters` object for any defined values.
+**Capture (`capture.ts` + `capture-report.ts`)** — there is exactly **one** capture pipeline, and it lives in `capture-report.ts`:
 
-**Sanitizer (`sanitizer.ts`)** cleans UTM parameter values:
-- `sanitizeValue()` strips HTML characters, control characters, applies custom patterns, and truncates to max length.
-- `sanitizeParams()` applies sanitization to all values in a `UtmParameters` object.
+```text
+capture.ts :: captureUtmParameters(url, options)   <-- thin wrapper, unchanged signature
+        |
+        +--> capture-report.ts :: captureUtmParametersWithReport(url, options).params
+
+URL parse  --(throws)-->  { params: {}, rejected: [], invalidUrl: TRUE }
+        |
+        v   ......... everything below runs inside ONE try/catch .........
+  PHASE 1 (per query parameter, in URL order)
+    isSnakeCaseUtmKey -> allowedParameters -> lowercaseValues -> collected[key]
+        |                       |                                  LAST-WINS
+        |                       +-- rejected once per key (reportedKeys Set)
+        v
+  PHASE 2 (per surviving key, one value each)
+    sanitize -> PII filter -> captured[key]
+        |
+        v
+  keyFormat conversion -> onCapture -> { params, rejected, invalidUrl: false }
+        |
+        +--(any throw)--> console.warn, { params: {}, rejected, invalidUrl: FALSE }
+```
+
+- `captureUtmParametersWithReport` returns `{ params, rejected, invalidUrl }`. It exists so a consumer can tell *"no campaign"* apart from *"campaign arrived and every parameter was filtered"* — collapsing the two inflates the direct-traffic denominator that every campaign share is measured against. `invalidUrl` is a third state again: an unparseable URL is neither.
+- **The two phases are ordered the way they are because duplicates must resolve before the gates run.** `?utm_source=good&utm_source=<pii>` has to yield `{}`: if each occurrence were gated as it was read, rejecting the later value would leave the earlier accepted `'good'` standing and a value would slip past the PII filter. Collecting last-wins first also means `onPiiDetected` — which receives the **raw** value — fires only for the value that actually survives, rather than for superseded occurrences, so a consumer is never handed raw PII for a value the pipeline discarded anyway.
+- A key blocked by `allowedParameters` is reported **once**, however many times it appears in the query string, tracked by a `reportedKeys` Set during phase 1.
+- `capture.ts` imports the runtime function from `capture-report.ts`; `capture-report.ts` imports the `CaptureOptions` **type** back from `capture.ts`. The back-edge is type-only, erased at build, so there is no runtime cycle.
+- Per-key processing (not batch `sanitizeParams`/`filterParams`) is what makes rejection attributable to a key.
+- `hasUtmParameters()` checks a `UtmParameters` object for any defined values, treating `''` as absent.
+
+**Sanitizer (`sanitizer.ts`)** cleans UTM parameter values. Rule order is:
+
+`stripHtml -> stripControlChars -> customPattern -> trim -> valuePattern -> maxLength`
+
+- `customPattern` is **subtractive** (every match is removed); `valuePattern` is a **positive allowlist gate** (the value is kept intact or dropped whole). `valuePattern` is tested *after* the trim, deliberately, so a value whose only offence is surrounding whitespace this function was about to remove is not rejected.
+- `onMaxLength` selects `'truncate'` (cut to `maxLength`, the default and the pre-existing behaviour) or `'drop'` (replace with `''`).
+- Rejected values become `''` rather than having the key removed: `hasUtmParameters` already treats `''` as absent, so it is the established "no value" sentinel and a second one would be inconsistent. PII reject mode *does* drop the key — that is pre-existing behaviour and is preserved.
+- `sanitizeValueWithReport()` is the real implementation, returning `{ value, rejected? }` where `rejected` is `'maxLength' | 'valuePattern'`. `sanitizeValue()` is a thin wrapper returning `.value`.
 
 **PII Filter (`pii-filter.ts`)** detects and handles personally identifiable information in parameter values:
 - `detectPii()` checks a value against enabled patterns and returns the matching pattern name.
-- `filterValue()` either rejects (returns undefined) or redacts (replaces with `[REDACTED]`) based on config mode.
+- `filterValueWithReport()` is the real implementation, returning `{ value, rejected? }` where `rejected` is `{ reason: 'pii' | 'allowlist', patternName? }`. `filterValue()` is a thin wrapper returning `.value` — undefined in reject mode, `'[REDACTED]'` in redact mode.
 - `filterParams()` applies filtering to all values in a `UtmParameters` object.
 
 **Attribution (`attribution.ts`)** handles first-touch / last-touch storage:
@@ -51,5 +83,12 @@ Path: @/src/inbound
 - **Attribution writes the main key in all modes**: Even in `'first'` and `'both'` modes, the main storage key (without suffix) is always written with the current params. The suffixed keys provide the historical first/last values.
 - **First-touch is write-once**: `storeWithAttribution` checks `hasStoredUtmParameters` for the first-touch key before writing. Once set, first-touch params are never overwritten.
 - **Data-attribute strategy strips utm_ prefix**: In the `'data-attribute'` strategy, `populateByDataAttribute` strips the `utm_` (or `utm`) prefix and lowercases the remainder to build the short name used in attribute matching (e.g., `utm_source` -> `source`).
+- **Reports never carry the rejected value.** `UtmRejection` holds a key, a reason, and for PII the pattern *name* only. `PiiFilterConfig.onPiiDetected` already warns that raw values must not be logged or transmitted, and a report struct carrying one would be handed straight to a logger by most consumers who use it. `patternName` is omitted entirely rather than set to `undefined`, so it does not surface in JSON.
+- **`lowercaseValues` is folded before every gate**, so `sanitize.customPattern`, `sanitize.valuePattern`, and `piiFiltering.allowlistPattern` can all be written assuming lowercase input. It uses `toLowerCase()`, never `toLocaleLowerCase()` — folding must not depend on locale. Keys are never folded. It lives on `CaptureOptions` rather than `SanitizeConfig` to mirror `BuildUtmUrlOptions.lowercaseValues` on the outbound side, which means it must also be threaded through `UtmConfig` in `@/src/config` for the React path.
+- **A value reduced to `''` by ordinary stripping is not a rejection.** That outcome predates the report; reporting it would hand every consumer spurious rejections from long-standing behaviour. Only the gates report.
+- **Capture never throws, because it runs on a page-load path.** The whole pipeline past the URL parse sits inside one guard: a consumer's malformed regex or half-built PII pattern (a `PiiPattern` with `enabled: true` and no `regex`, say) degrades to "no parameters" plus a `console.warn`, not a broken page. Its equivalent on the server side is the per-key guard in `@/src/server/normalize.ts`, which degrades one key to `absentValue` rather than failing the request.
+- **`invalidUrl` means URL-parse failure specifically, not pipeline failure.** The pipeline guard returns `invalidUrl: false` — the URL parsed fine, the processing did not. A consumer branching on `invalidUrl` to decide "the caller handed us garbage" would be wrong to read it as "something went wrong".
+- **`UtmRejection.key` is attacker-controlled and `CaptureReport.rejected` is unbounded.** Any `utm_`-prefixed query parameter is captured, so `?utm_someone@example.com=1` produces a rejection whose *key* contains an email, and a URL carrying hundreds of offending parameters produces hundreds of entries. The report withholds rejected **values** but not untrusted **keys**; filter to expected keys and cap the array before logging one or emitting metrics keyed on its contents.
+- **The single-pipeline invariant matters.** Any change to capture semantics belongs in `capture-report.ts`; `captureUtmParameters` cannot drift from it because it is a delegation, not a copy. The flip side is that a test comparing the two proves nothing — see `@/__tests__/docs.md`.
 
 Created and maintained by Nori.

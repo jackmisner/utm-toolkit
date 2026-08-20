@@ -6,10 +6,7 @@
  */
 
 import type { KeyFormat, PiiFilterConfig, SanitizeConfig, UtmParameters } from '../types'
-import { DEFAULT_PII_FILTER_CONFIG, DEFAULT_SANITIZE_CONFIG } from '../config/defaults'
-import { convertParams, isSnakeCaseUtmKey } from '../common/keys'
-import { filterParams } from './pii-filter'
-import { sanitizeParams } from './sanitizer'
+import { captureUtmParametersWithReport } from './capture-report'
 
 /**
  * Options for capturing UTM parameters
@@ -20,6 +17,19 @@ export interface CaptureOptions {
 
   /** Allowlist of parameters to capture (snake_case format, e.g., ['utm_source', 'utm_campaign']) */
   allowedParameters?: string[]
+
+  /**
+   * Lowercase all captured values (default: false)
+   *
+   * Mirrors `BuildUtmUrlOptions.lowercaseValues` on the outbound side. Applied
+   * before sanitization and PII filtering, so every downstream gate —
+   * `sanitize.customPattern`, `sanitize.valuePattern` and
+   * `piiFiltering.allowlistPattern` — sees the folded value and can be written
+   * without allowing uppercase.
+   *
+   * Keys are unaffected; only values are folded.
+   */
+  lowercaseValues?: boolean
 
   /** Sanitization configuration — when enabled, strips dangerous characters from values */
   sanitize?: Partial<SanitizeConfig>
@@ -71,76 +81,10 @@ function isBrowser(): boolean {
  * ```
  */
 export function captureUtmParameters(url?: string, options: CaptureOptions = {}): UtmParameters {
-  const { keyFormat = 'snake_case', allowedParameters, sanitize, piiFiltering, onCapture } = options
-
-  // Get URL, defaulting to current page URL in browser
-  const urlString = url ?? (isBrowser() ? window.location.href : '')
-
-  // SSR safety: return empty object if no URL available
-  if (!urlString) {
-    return {}
-  }
-
-  try {
-    // Parse the URL to extract query parameters
-    const urlObj = new URL(urlString)
-    const params: Record<string, string> = {}
-
-    // Create a set of allowed parameters for O(1) lookup
-    const allowedSet =
-      allowedParameters && allowedParameters.length > 0 ? new Set(allowedParameters) : null
-
-    // Iterate through all query parameters
-    for (const [key, value] of urlObj.searchParams.entries()) {
-      // Only capture parameters that start with 'utm_' (case-sensitive)
-      if (isSnakeCaseUtmKey(key)) {
-        // If allowedParameters is provided, check if this parameter is allowed
-        if (allowedSet === null || allowedSet.has(key)) {
-          params[key] = value
-        }
-      }
-    }
-
-    // Apply sanitization if configured and enabled
-    const resolvedSanitize: SanitizeConfig = { ...DEFAULT_SANITIZE_CONFIG, ...sanitize }
-    const sanitized: UtmParameters = resolvedSanitize.enabled
-      ? sanitizeParams(params as UtmParameters, resolvedSanitize)
-      : (params as UtmParameters)
-
-    // Apply PII filtering if configured and enabled
-    const resolvedPiiFilter: PiiFilterConfig = {
-      ...DEFAULT_PII_FILTER_CONFIG,
-      ...piiFiltering,
-      patterns: piiFiltering?.patterns ?? [...DEFAULT_PII_FILTER_CONFIG.patterns],
-    }
-    const captured: UtmParameters = resolvedPiiFilter.enabled
-      ? filterParams(sanitized, resolvedPiiFilter)
-      : sanitized
-
-    // Convert to target format if needed
-    const result = keyFormat === 'camelCase' ? convertParams(captured, 'camelCase') : captured
-
-    // Fire onCapture callback if params were found
-    if (onCapture && Object.keys(result).length > 0) {
-      try {
-        onCapture(result)
-      } catch {
-        // Callbacks must not break the pipeline
-      }
-    }
-
-    return result
-  } catch (error) {
-    // If URL parsing fails, return empty object
-    // This ensures the function is robust and doesn't break the app
-    if (typeof console !== 'undefined' && console.warn) {
-      console.warn(
-        'Failed to parse URL for UTM parameters:',
-        error instanceof Error ? error.message : 'Unknown error',
-      )
-    }
-    return {}
-  }
+  // Delegates so there is exactly one capture pipeline. Use
+  // captureUtmParametersWithReport directly when you need to tell "no campaign"
+  // apart from "campaign rejected".
+  return captureUtmParametersWithReport(url, options).params
 }
 
 /**

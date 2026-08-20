@@ -13,11 +13,32 @@ export {
   type CaptureOptions,
 } from './capture'
 
+// Capture reporting — tells "no campaign" apart from "campaign rejected"
+export {
+  captureUtmParametersWithReport,
+  type UtmRejection,
+  type UtmRejectionReason,
+  type CaptureReport,
+} from './capture-report'
+
 // Sanitizer utilities
-export { sanitizeValue, sanitizeParams } from './sanitizer'
+export {
+  sanitizeValue,
+  sanitizeParams,
+  sanitizeValueWithReport,
+  type SanitizeRejection,
+  type SanitizeValueResult,
+} from './sanitizer'
 
 // PII filter utilities
-export { detectPii, filterValue, filterParams } from './pii-filter'
+export {
+  detectPii,
+  filterValue,
+  filterParams,
+  filterValueWithReport,
+  type PiiRejection,
+  type FilterValueResult,
+} from './pii-filter'
 
 // Form field population
 export { populateFormFields, createUtmHiddenFields, type FormPopulateOptions } from './form'

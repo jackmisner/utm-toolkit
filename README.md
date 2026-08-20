@@ -13,6 +13,8 @@ A comprehensive TypeScript library for capturing, storing, and appending UTM tra
 - **Store** in sessionStorage or localStorage (with optional TTL)
 - **Attribution** — first-touch, last-touch, or both
 - **Form population** — inject UTM data into HTML forms (vanilla JS + React)
+- **Rejection reporting** — tell "no campaign" apart from "campaign rejected"
+- **Case folding** — normalize `LinkedIn` and `linkedin` to one campaign
 
 ### Outbound (Creating UTM-tagged links)
 - **Append** UTM parameters to share URLs
@@ -28,6 +30,7 @@ A comprehensive TypeScript library for capturing, storing, and appending UTM tra
 - **React hook** and context provider
 - **Debug utilities** for troubleshooting
 - **SSR-safe** with graceful fallbacks
+- **Server entry** (`/server`) — DOM-free normalization for public ingest endpoints
 - **Zero dependencies** (peer dependency on React is optional)
 
 ## Installation
@@ -274,6 +277,49 @@ const params = captureUtmParameters(url, {
 });
 ```
 
+#### Dropping instead of truncating
+
+By default an over-length value is truncated to `maxLength`. Truncation invents a value nobody sent, and two campaigns sharing a long prefix collapse into one. Set `onMaxLength: 'drop'` when values key a datastore — an absent parameter is honest, a fabricated one is not.
+
+```typescript
+captureUtmParameters(url, {
+  sanitize: { enabled: true, maxLength: 64, onMaxLength: 'drop' },
+});
+// An over-length utm_source becomes '' rather than its first 64 characters
+```
+
+#### Gating values with `valuePattern`
+
+`valuePattern` is a positive allowlist: a value that does not match becomes `''`. Note how it differs from the two adjacent regex options:
+
+| Option | Effect |
+|--------|--------|
+| `sanitize.customPattern` | **Subtractive** — strips every match from the value |
+| `sanitize.valuePattern` | **A gate** — keeps the value intact, or drops it whole |
+| `piiFiltering.allowlistPattern` | The same gate, scoped to PII decisions, and able to produce `'[REDACTED]'` in redact mode |
+
+```typescript
+captureUtmParameters(url, {
+  sanitize: { enabled: true, valuePattern: /^[a-z0-9_-]+$/ },
+});
+// 'spring-2025' survives; 'has spaces!' becomes ''
+```
+
+The gate is tested against the *trimmed* value, so surrounding whitespace never causes a rejection on its own.
+
+#### Folding case with `lowercaseValues`
+
+`LinkedIn` and `linkedin` are the same campaign. Anyone keying a store on captured values gets two rows unless the values are folded. `lowercaseValues` is the inbound counterpart of `buildUtmUrl`'s option of the same name:
+
+```typescript
+captureUtmParameters('https://example.com?utm_source=LinkedIn', {
+  lowercaseValues: true,
+});
+// { utm_source: 'linkedin' }
+```
+
+Folding runs **before** sanitization and PII filtering, so `customPattern`, `valuePattern` and `piiFiltering.allowlistPattern` all see the folded value and can be written without allowing uppercase. Keys are never folded, only values. It uses `toLowerCase()` rather than `toLocaleLowerCase()`, so the result does not depend on the host locale.
+
 ### PII Filtering
 
 Detect and filter personally identifiable information (email addresses, phone numbers) from UTM parameter values. Prevents PII from leaking into analytics via misconfigured tracking links. Disabled by default.
@@ -313,6 +359,79 @@ const params = captureUtmParameters(url, {
 ```
 
 Built-in PII patterns detect: email addresses, international phone numbers, UK phone numbers, and US phone numbers.
+
+### Telling "No Campaign" Apart From "Campaign Rejected"
+
+`captureUtmParameters` returns `{}` for two completely different situations: genuine direct traffic, and a campaign link whose every parameter was filtered. Collapsing them inflates the direct-traffic denominator that every campaign share is measured against.
+
+`captureUtmParametersWithReport` separates them:
+
+```typescript
+import { captureUtmParametersWithReport } from '@jackmisner/utm-toolkit';
+
+const { params, rejected, invalidUrl } = captureUtmParametersWithReport(url, {
+  piiFiltering: { enabled: true },
+});
+
+if (invalidUrl) {
+  // The URL could not be parsed at all — neither direct traffic nor a campaign
+} else if (Object.keys(params).length === 0 && rejected.length > 0) {
+  // A campaign link arrived and every parameter was filtered.
+  // This is NOT direct traffic.
+  console.warn('rejected:', rejected);
+  // [{ key: 'utm_source', reason: 'pii', patternName: 'email' }]
+}
+```
+
+Rejection reasons are `'allowedParameters'`, `'valuePattern'`, `'maxLength'`, `'allowlist'`, `'pii'` and `'notAString'` (server-side only). Rejections are recorded per parameter, so one bad parameter never costs you the whole campaign.
+
+> **The report deliberately omits the rejected value.** It carries the key, the reason, and for PII the matching pattern name — nothing else. A report struct containing the raw value would be handed straight to a logger by most consumers, which is exactly what PII filtering exists to prevent.
+
+> **But the `key` is not sanitized.** Any `utm_`-prefixed query parameter is captured, so the key comes straight from the URL and an attacker controls it — `?utm_someone@example.com=1` produces a rejection whose `key` contains an email address. `rejected` is also unbounded, one entry per offending parameter. Treat the report as untrusted input before logging it: filter to the keys you expect, and cap the length.
+
+`captureUtmParameters` delegates to this function and returns `.params`, so the two can never drift apart.
+
+### Sending Captured Params to a Server
+
+If you POST captured parameters to your own endpoint, there is a trap in `navigator.sendBeacon` worth knowing about before you hit it.
+
+**`sendBeacon` does not send JSON.** `navigator.sendBeacon(url, JSON.stringify(params))` sends `Content-Type: text/plain;charset=UTF-8`. A server that only parses `application/json` receives the body as a raw string, JSON parsing fails, and — if the server is written defensively — the campaign silently becomes empty while the endpoint still answers `204`. There is no error anywhere, and every campaign is attributed to direct traffic.
+
+Wrapping the body in a `Blob` typed `application/json` does not fix it. That makes the request non-simple, `sendBeacon` cannot perform the CORS preflight, and the browser drops the request entirely — also silently.
+
+There are two workable options, and the tradeoff is real:
+
+```typescript
+// Option 1 — fetch with keepalive. Sends real JSON, survives page unload,
+// but is subject to CORS preflight and a ~64KB keepalive body limit.
+fetch('/api/utm', {
+  method: 'POST',
+  keepalive: true,
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(params),
+});
+
+// Option 2 — sendBeacon, and a server that accepts text/plain.
+navigator.sendBeacon('/api/utm', JSON.stringify(params));
+```
+
+If you choose option 2, the server has to opt into the content type it will actually receive:
+
+```typescript
+// Fastify — register text/plain and parse it as JSON
+fastify.addContentTypeParser('text/plain', { parseAs: 'string' }, (_req, body, done) => {
+  try {
+    done(null, JSON.parse(body as string));
+  } catch {
+    done(null, {}); // Never throw on an untrusted body
+  }
+});
+
+// Express
+app.use(express.text({ type: 'text/plain' }));
+```
+
+Either way, normalize what arrives — see [Server-Side Usage](#server-side-usage) below. The client-side pass cannot be trusted for a public endpoint, because anyone can POST to it directly.
 
 ### Event Callbacks
 
@@ -652,6 +771,56 @@ installDebugHelpers();
 // Then use: window.utmDebug.state(), window.utmDebug.check()
 ```
 
+## Server-Side Usage
+
+`@jackmisner/utm-toolkit/server` is a DOM-free entry point for applying the same folding rules server-side. It exists because **the client-side pass cannot be trusted for a public endpoint** — anyone can POST to it directly.
+
+```typescript
+import { normalizeUtmParams } from '@jackmisner/utm-toolkit/server';
+
+app.post('/api/utm', async (req, res) => {
+  const { params, rejected } = normalizeUtmParams(req.body);
+
+  // params is TOTAL: every allowed key is present, absent ones are ''
+  // { utm_source: 'linkedin', utm_medium: '', utm_campaign: '', ... }
+  await db.insertCampaignHit(params);
+
+  if (rejected.length > 0) metrics.increment('utm.rejected', rejected.length);
+  res.status(204).end();
+});
+```
+
+For a server that has a URL rather than a parsed body — a `Referer` header, a redirect target — use `normalizeUtmUrl(url, options)`. It has the same contract.
+
+### Why the output is total
+
+Every key in `allowedParameters` is always present, with absent parameters set to `absentValue` (default `''`). If you write these into a composite primary key, absence has to be a value that **groups**: `NULL` does not deduplicate in most stores, so a nullable column fragments one campaign into as many rows as it has absent parameters. Set `absentValue` to something unforgeable if `''` could collide with a real campaign value.
+
+### It never throws
+
+The argument is an untrusted HTTP body, so a throw is a 500 on somebody's first page load. `null`, `42`, `'a string'`, `[]`, `{ utm_source: ['a','b'] }` and a body with a `__proto__` key all produce a usable total result. Non-string values are **rejected rather than coerced** — `String(['a','b'])` is `'a,b'`, a value nobody sent.
+
+### Server defaults differ from browser defaults, deliberately
+
+| Option | Server default | Browser default | Why |
+|--------|----------------|-----------------|-----|
+| `lowercase` | `true` | `false` | `LinkedIn` and `linkedin` are one campaign |
+| `onMaxLength` | `'drop'` | `'truncate'` | A truncated value is one nobody sent |
+| `piiFiltering` | enabled | disabled | The endpoint is public |
+| `allowedParameters` | all six standard params, **including `utm_id`** | same | Narrow it if you key fewer columns |
+
+The browser defaults are lenient because losing a campaign label client-side is cheap. A server keying a datastore needs determinism.
+
+`piiFiltering.mode` is deliberately **not** configurable here. `'[REDACTED]'` persisted as a campaign value is a campaign nobody ran, which is worse than dropping it; server-side filtering always rejects.
+
+> **On `utm_id`:** the server defaults to all six standard parameters, matching the browser. If your table keys five columns, pass `allowedParameters` explicitly — a consumer keying five against a library producing six gets a mystery extra row.
+
+### What this entry point cannot reach
+
+`/server` does not import storage, form population, link decoration, debug helpers or React. That restriction is enforced by a test that walks the module's runtime import graph, not just documented — so the guarantee cannot be quietly removed by a convenient re-export.
+
+Note the honest framing: the root entry does **not** crash in Node. The reasons to use `/server` are the documented DOM-free surface, the server-appropriate defaults, the totality contract, and a smaller install/parse surface — the server bundle is roughly 5KB against the root entry's 52KB.
+
 ## Configuration Options
 
 | Option | Type | Default | Description |
@@ -664,6 +833,7 @@ installDebugHelpers();
 | `captureOnMount` | `boolean` | `true` | Auto-capture on React hook mount |
 | `appendToShares` | `boolean` | `true` | Append UTM params to share URLs |
 | `allowedParameters` | `string[]` | Standard UTM params | Params to capture |
+| `lowercaseValues` | `boolean` | `false` | Fold captured values to lowercase (runs before sanitize and PII gates) |
 | `defaultParams` | `object` | `{}` | Fallback params when none captured |
 | `shareContextParams` | `object` | `{}` | Platform-specific params |
 | `excludeFromShares` | `string[]` | `[]` | Params to exclude from shares |
@@ -675,6 +845,20 @@ installDebugHelpers();
 | `onClear` | `function` | `undefined` | Callback when stored params are cleared |
 | `onAppend` | `function` | `undefined` | Callback after UTM params are appended to a URL |
 | `onExpire` | `function` | `undefined` | Callback when stored params expire (TTL) |
+
+### `SanitizeConfig`
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | `boolean` | `false` | Enable sanitization |
+| `stripHtml` | `boolean` | `true` | Strip HTML-significant characters: `<` `>` `"` `'` and backtick |
+| `stripControlChars` | `boolean` | `true` | Strip control characters except tab/newline/CR |
+| `maxLength` | `number` | `200` | Maximum value length |
+| `onMaxLength` | `'truncate' \| 'drop'` | `'truncate'` | Truncate an over-length value, or drop it to `''` |
+| `customPattern` | `RegExp` | `undefined` | **Subtractive** — strips every match from the value |
+| `valuePattern` | `RegExp` | `undefined` | **A gate** — keeps the value whole, or drops it to `''` |
+
+Rules apply in order: `stripHtml` → `stripControlChars` → `customPattern` → trim → `valuePattern` → `maxLength`.
 
 ## TypeScript Types
 

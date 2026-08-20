@@ -24,7 +24,7 @@ Releases are done via `npm run release:patch|minor|major` which creates a `relea
 Dependabot runs weekly (`.github/dependabot.yml`). Minor/patch npm bumps arrive as one grouped PR; majors get individual PRs. Two things to know:
 
 - **React majors are ignored on purpose.** Which React line the tests run against is a support-matrix decision tied to the `peerDependencies: react >=16.8.0` claim, so it gets changed deliberately rather than by a weekly bump.
-- **oxlint's native bindings require Node `^20.19.0 || >=22.12.0`**, but `ci-node18.yml` runs `npm run lint`. This installs today only because npm 10 skips engine checks on optional dependencies. If the Node 18 lint step ever fails with a missing native binding, drop lint from that job (or drop Node 18) rather than pinning oxlint back.
+- **oxlint does not run on Node 18.** Its native bindings require Node `^20.19.0 || >=22.12.0`, so npm skips installing them and oxlint fails with `Cannot find module './oxlint.linux-x64-gnu.node'`. `ci-node18.yml` therefore has no lint step — lint runs on the Node 20 and 22 jobs only. Do not "fix" this by pinning oxlint back; linting the same source once is enough, and the Node 18 job exists to prove the library runs there, not to re-lint it.
 
 ## Test Setup
 

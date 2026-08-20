@@ -23,8 +23,13 @@ jobs:
       - name: TypeScript type checking
         run: npm run type-check
 
-      - name: Lint
-        run: npm run lint
+      # No lint step here. oxlint's native bindings require Node
+      # ^20.19.0 || >=22.12.0, so npm skips installing them on Node 18 and
+      # oxlint fails with "Cannot find module './oxlint.linux-x64-gnu.node'".
+      # Linting is static analysis of source — the node20 and node22 jobs
+      # already cover it, and repeating it per Node version proves nothing.
+      # This job's purpose is to prove the library itself runs on Node 18,
+      # which type-check, test and build below still do.
 
       - name: Run tests
         env:

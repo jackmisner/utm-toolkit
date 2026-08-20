@@ -30,7 +30,11 @@ useState initializer --> getStoredUtmParameters({storageType}) --> initial state
 useEffect (once, via ref guard) --> if captureOnMount && enabled:
   |
   v
-capture() --> captureUtmParameters(window.location.href, {sanitize, piiFiltering}) --> if has params:
+capture() --> captureUtmParameters(window.location.href, <capture options from resolved config>)
+  |             where the options are keyFormat, allowedParameters, lowercaseValues,
+  |             sanitize, piiFiltering and the onCapture callback
+  |
+  |                                                          --> if has params:
   |                                                            storeUtmParameters({storageType, ttl})
   |                                                            setUtmParameters()
   |                                                          else if has defaultParams:
@@ -57,6 +61,8 @@ URL with UTM params
 - **Initialization guard**: `hasInitialized.current` is a ref (not state), so the guard works correctly across strict mode double-effects without triggering re-renders.
 - **`appendToUrl` exclusion logic**: The `excludeFromShares` filter converts camelCase keys to snake_case using inline regex (not the `toSnakeCase` utility), so it duplicates some conversion logic from `@/src/common/keys.ts`.
 - **Storage options forwarding**: The hook passes `storageType` and `ttl` from the resolved config to `storeUtmParameters`, `getStoredUtmParameters`, and `clearStoredUtmParameters`. The `clear` callback passes `storageType` so it clears the correct backend.
+- **Capture options forwarding is the React path's only route to `CaptureOptions`**: consumers of the hook configure capture through `UtmConfig`, so any `CaptureOptions` field must be mapped explicitly in `useUtmTracking`'s call *and* exist on `UtmConfig`/`ResolvedUtmConfig`/`DEFAULT_CONFIG` in `@/src/config`. A field present on `CaptureOptions` but not forwarded here is simply unreachable from React.
+- **The hook uses `captureUtmParameters`, not `captureUtmParametersWithReport`**: the hook's public surface exposes captured params only, so rejection reporting is not surfaced through React state. Consumers wanting to distinguish "no campaign" from "campaign rejected" call `captureUtmParametersWithReport` from `@/src/inbound` directly.
 - **SSR safety**: The `useState` initializer checks `typeof window === 'undefined'` and returns `null` for server rendering. The `capture` callback also checks before accessing `window.location`. Form and decorator components/hooks guard against `document` being undefined.
 
 Created and maintained by Nori.

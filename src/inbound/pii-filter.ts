@@ -44,8 +44,49 @@ export function filterValue(
   value: string,
   config: PiiFilterConfig,
 ): string | undefined {
+  return filterValueWithReport(key, value, config).value
+}
+
+/**
+ * Why the PII filter rejected a value.
+ *
+ * `'allowlist'` means the value failed `allowlistPattern`; `'pii'` means a
+ * detection pattern matched, and `patternName` names it.
+ */
+export interface PiiRejection {
+  reason: 'pii' | 'allowlist'
+  patternName?: string
+}
+
+/**
+ * Result of PII-filtering a value, with the reason it was rejected if it was.
+ */
+export interface FilterValueResult {
+  /** The value, `undefined` in reject mode, or `'[REDACTED]'` in redact mode */
+  value: string | undefined
+  /** Set only when the filter rejected the value */
+  rejected?: PiiRejection
+}
+
+/**
+ * Filter a value for PII and report why it was rejected
+ *
+ * Same rules as {@link filterValue}; this variant additionally reports which
+ * check rejected the value. The rejected value itself is never included in the
+ * result — see the warning on `PiiFilterConfig.onPiiDetected`.
+ *
+ * @param key - The parameter key (for callback reporting)
+ * @param value - The parameter value to check
+ * @param config - PII filter configuration
+ * @returns The filtered value plus an optional rejection reason
+ */
+export function filterValueWithReport(
+  key: string,
+  value: string,
+  config: PiiFilterConfig,
+): FilterValueResult {
   if (!config.enabled) {
-    return value
+    return { value }
   }
 
   // Allowlist check takes precedence
@@ -57,10 +98,13 @@ export function filterValue(
       } catch {
         // Callback errors should not break the filter pipeline
       }
-      return config.mode === 'redact' ? '[REDACTED]' : undefined
+      return {
+        value: config.mode === 'redact' ? '[REDACTED]' : undefined,
+        rejected: { reason: 'allowlist' },
+      }
     }
     // Value passes allowlist — no further checks needed
-    return value
+    return { value }
   }
 
   // Pattern-based PII detection
@@ -71,10 +115,13 @@ export function filterValue(
     } catch {
       // Callback errors should not break the filter pipeline
     }
-    return config.mode === 'redact' ? '[REDACTED]' : undefined
+    return {
+      value: config.mode === 'redact' ? '[REDACTED]' : undefined,
+      rejected: { reason: 'pii', patternName: detected.name },
+    }
   }
 
-  return value
+  return { value }
 }
 
 /**

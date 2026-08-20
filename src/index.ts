@@ -15,14 +15,26 @@ export {
   captureWithReferrer,
   type CaptureOptions,
 
+  // Capture reporting
+  captureUtmParametersWithReport,
+  type UtmRejection,
+  type UtmRejectionReason,
+  type CaptureReport,
+
   // Sanitizer
   sanitizeValue,
   sanitizeParams,
+  sanitizeValueWithReport,
+  type SanitizeRejection,
+  type SanitizeValueResult,
 
   // PII Filter
   detectPii,
   filterValue,
   filterParams,
+  filterValueWithReport,
+  type PiiRejection,
+  type FilterValueResult,
 
   // Form field population
   populateFormFields,

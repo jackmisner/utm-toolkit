@@ -44,6 +44,12 @@ const TRAPPED_GLOBALS = [
 /** Imported before the traps go up, so their own evaluation is not attributed here. */
 const EXTERNALS = ['react', 'react/jsx-runtime']
 
+function countByType(resources) {
+  const counts = {}
+  for (const type of resources) counts[type] = (counts[type] ?? 0) + 1
+  return counts
+}
+
 function collectEntries(exportsMap) {
   const found = new Set()
   const walk = (node) => {
@@ -102,6 +108,8 @@ async function runProbe(target, format, outFile) {
     }
   }
 
+  const resourcesBefore = countByType(process.getActiveResourcesInfo())
+
   let failure = null
   try {
     if (format === 'cjs') {
@@ -113,7 +121,17 @@ async function runProbe(target, format, outFile) {
     failure = error instanceof Error ? error.message : String(error)
   }
 
+  const resourcesAfter = countByType(process.getActiveResourcesInfo())
+  for (const [type, count] of Object.entries(resourcesAfter)) {
+    const added = count - (resourcesBefore[type] ?? 0)
+    if (added > 0) accesses.push(`left ${added} active ${type} handle(s) behind`)
+  }
+
   writeFileSync(outFile, JSON.stringify({ accesses, unprotected, failure }))
+
+  // A timer, socket or listener started during evaluation would otherwise keep
+  // this process alive and stall the parent instead of failing it.
+  process.exit(0)
 }
 
 /**
@@ -128,6 +146,7 @@ function probe(target, format) {
     const result = spawnSync(process.execPath, [selfPath, '--probe', target, format, outFile], {
       encoding: 'utf-8',
       cwd: root,
+      timeout: 30_000,
     })
 
     try {
@@ -152,25 +171,28 @@ function probe(target, format) {
 function selfTestFailure() {
   const dir = mkdtempSync(join(tmpdir(), 'utm-side-effects-'))
   try {
-    const body =
+    const accessBody =
       "console.log('impure')\nprocess.stdout.write('impure')\nconst probed = sessionStorage\n"
+    const accessExpectations = ['console.log()', 'process.stdout.write()', 'read sessionStorage']
+    const timerBody = 'const handle = setInterval(() => {}, 1000)\n'
+    const timerExpectations = ['active Timeout handle']
+
     const cases = [
-      [join(dir, 'impure.mjs'), `${body}export default probed\n`, 'esm'],
-      [join(dir, 'impure.cjs'), `${body}module.exports = probed\n`, 'cjs'],
+      ['impure.mjs', `${accessBody}export default probed\n`, 'esm', accessExpectations],
+      ['impure.cjs', `${accessBody}module.exports = probed\n`, 'cjs', accessExpectations],
+      ['timer.mjs', `${timerBody}export default handle\n`, 'esm', timerExpectations],
+      ['timer.cjs', `${timerBody}module.exports = handle\n`, 'cjs', timerExpectations],
     ]
 
-    for (const [file, source, format] of cases) {
+    for (const [name, source, format, expectations] of cases) {
+      const file = join(dir, name)
       writeFileSync(file, source)
       const { accesses, failure } = probe(file, format)
-      if (failure) return `probing a known-impure ${format} module errored: ${failure}`
-      if (!accesses.includes('console.log()')) {
-        return `probe missed a console.log() in a known-impure ${format} module`
-      }
-      if (!accesses.includes('process.stdout.write()')) {
-        return `probe missed a process.stdout.write() in a known-impure ${format} module`
-      }
-      if (!accesses.includes('read sessionStorage')) {
-        return `probe missed a sessionStorage read in a known-impure ${format} module`
+      if (failure) return `probing known-impure ${name} errored: ${failure}`
+      for (const expected of expectations) {
+        if (!accesses.some((access) => access.includes(expected))) {
+          return `probe missed ${expected} in known-impure ${name}`
+        }
       }
     }
     return null
@@ -203,7 +225,9 @@ function main() {
     const { accesses, unprotected, failure } = probe(target, format)
 
     if (failure) {
-      problems.push(`${entry}: could not be imported (${failure}). Run \`npm run build\` first.`)
+      problems.push(
+        `${entry}: could not be imported (${failure}). Run \`npm ci\` and \`npm run build\` first.`,
+      )
       continue
     }
     if (unprotected.length > 0) {

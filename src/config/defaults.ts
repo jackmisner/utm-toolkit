@@ -86,13 +86,11 @@ export const STANDARD_UTM_PARAMETERS = [
  * Default configuration with all values set
  * This is used as the base when merging with user-provided config
  */
-/**
- * The copies below are annotated calls rather than spreads because a bundler
- * cannot prove a spread pure — it invokes an iterator — and so retains this
- * object even where nothing references it, costing a consumer about a kilobyte.
- * `scripts/assert-bundle-budget.js` fails if an annotation is lost.
- */
 export const DEFAULT_CONFIG: ResolvedUtmConfig = {
+  // The copies here are annotated calls rather than spreads because a bundler
+  // cannot prove a spread pure — it invokes an iterator — and so retains this
+  // object even where nothing references it, costing a consumer about a
+  // kilobyte. scripts/assert-bundle-budget.js fails if an annotation is lost.
   /** UTM tracking is enabled by default */
   enabled: true,
 

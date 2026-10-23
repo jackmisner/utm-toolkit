@@ -7,7 +7,7 @@
  * What this protects is a `/* @__PURE__ *\/` annotation on each module-scope
  * default in src/config/defaults.ts and src/common/keys.ts. A bundler needs
  * those to prove the defaults droppable; without them it retains DEFAULT_CONFIG
- * and its dependencies, which measured 1,347 bytes against 306. They are
+ * and its dependencies, which measured 1,344 bytes against 303 here. They are
  * comments, so removing one — or adding an un-annotated spread to DEFAULT_CONFIG
  * — costs every consumer about a kilobyte and changes nothing any test can see.
  *
@@ -23,7 +23,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
 
 /**
- * Measured at 306 bytes when every module-scope default is annotated. The
+ * Measured at 303 bytes when every module-scope default is annotated. The
  * headroom absorbs ordinary growth in the one function under test while still
  * catching the loss of an annotation, the cheapest of which is worth ~170 bytes.
  */

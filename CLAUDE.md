@@ -7,6 +7,7 @@
 - **Lint**: `npm run lint` (oxlint)
 - **Format**: `npm run format` (prettier)
 - **Type check**: `npm run type-check`
+- **Package check**: `npm run check:package` (builds, then publint + attw against the packed tarball)
 
 ## Gotchas
 
@@ -14,6 +15,8 @@
 - `validator.ts` has module-level mutable state (`defaultProtocol`). Tests that call `setDefaultProtocol()` must restore the original value.
 - The React hook freezes config at mount via `useRef` — config prop changes after mount are ignored.
 - All URL-facing operations convert keys to `snake_case` internally, regardless of the consumer's `keyFormat` setting.
+- `check:package` runs attw with `--profile node16`. The `node10` row fails for `/react` and `/server` because legacy resolution cannot see `exports` subpaths; that is a declared non-target, not a bug to fix. `typesVersions` would green the row for types only, so it was deliberately left out.
+- publint and attw each catch what the other misses. attw exits 0 on a tarball containing no declarations at all, so publint is what catches missing or unpublished files; publint passes a correctly-wired `exports` map whose declarations import chunks the build never emitted, so attw is what catches that. Dropping either silently loses a class of failure.
 
 ## Releases
 
@@ -26,6 +29,7 @@ Dependabot runs weekly (`.github/dependabot.yml`). Minor/patch npm bumps arrive 
 - **React majors are ignored on purpose.** Which React line the tests run against is a support-matrix decision tied to the `peerDependencies: react >=16.8.0` claim, so it gets changed deliberately rather than by a weekly bump.
 - **TypeScript majors are ignored because they are blocked upstream.** tsup bundles `rollup-plugin-dts` pinned against TypeScript 5.x, and TS 7 removed the `useCaseSensitiveFileNames` API it calls, so `npm run build` fails before emitting declarations. Remove the ignore once tsup ships a TS 7-compatible `rollup-plugin-dts`.
 - **vitest and `@vitest/coverage-v8` are grouped, majors included.** `coverage-v8` peer-requires the exact matching vitest version, so raised separately neither can pass `npm ci`.
+- **publint and `@arethetypeswrong/cli` are grouped on their own, majors included.** Both are pre-1.0, where a breaking change ships as a minor. Either can start failing `npm run check:package` against unchanged package code, and in the grouped `npm-minor-patch` PR that would block every unrelated bump behind it.
 - **The test toolchain sets the Node floor, not the library.** jsdom requires Node 22+ and vitest requires 20+, so CI tests 22/24/26. `engines.node` is `>=20.0.0`: the published bundle has no Node-version-specific code, but nothing below 22 is exercised. Raise the floor rather than pinning the toolchain back if this ever conflicts.
 
 ## Test Setup

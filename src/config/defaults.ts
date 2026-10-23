@@ -91,6 +91,9 @@ export const DEFAULT_CONFIG: ResolvedUtmConfig = {
   // cannot prove a spread pure — it invokes an iterator — and so retains this
   // object even where nothing references it, costing a consumer about a
   // kilobyte. scripts/assert-bundle-budget.js fails if an annotation is lost.
+  // The sources must stay plain data literals: a getter, a __proto__ key or a
+  // Proxy on any of them makes an annotation false, and a bundler would then
+  // drop a call that is not pure.
   /** UTM tracking is enabled by default */
   enabled: true,
 

@@ -5,11 +5,19 @@
  * ship more than BUDGET_BYTES.
  *
  * What this protects is a `/* @__PURE__ *\/` annotation on each module-scope
- * default in src/config/defaults.ts and src/common/keys.ts. A bundler needs
- * those to prove the defaults droppable; without them it retains DEFAULT_CONFIG
- * and its dependencies, which measured 1,344 bytes against 303 here. They are
- * comments, so removing one — or adding an un-annotated spread to DEFAULT_CONFIG
- * — costs every consumer about a kilobyte and changes nothing any test can see.
+ * initialiser in src/config/defaults.ts. A bundler needs those to prove
+ * DEFAULT_CONFIG droppable; without one it retains the whole object and its
+ * dependencies, which measures ~1,200 bytes against ~300. They are comments, so
+ * removing one costs every consumer about a kilobyte and changes nothing any
+ * test can see.
+ *
+ * It does NOT cover the two annotations in src/common/keys.ts, which are worth
+ * 153 and 21 bytes: catching the 21 would need a ceiling with no headroom at
+ * all. A breach therefore always points at defaults.ts.
+ *
+ * The bundle is executed as well as weighed, because an annotation on a call
+ * that is not in fact pure would license a bundler to drop something needed,
+ * and no test here bundles anything.
  *
  * Usage: node scripts/assert-bundle-budget.js
  */
@@ -23,9 +31,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
 
 /**
- * Measured at 303 bytes when every module-scope default is annotated. The
- * headroom absorbs ordinary growth in the one function under test while still
- * catching the loss of an annotation, the cheapest of which is worth ~170 bytes.
+ * ~300 bytes with every defaults.ts initialiser annotated, ~1,200 with any one
+ * of them lost. The headroom absorbs ordinary growth in the function under test
+ * and patch-level minifier drift.
  */
 const BUDGET_BYTES = 600
 
@@ -64,13 +72,23 @@ async function main() {
       `Importing { ${SYMBOL} } from the root entry now bundles to ${bytes} bytes, over the ${BUDGET_BYTES} budget.`,
     )
     console.error(
-      'A module-scope value in src/config/defaults.ts or src/common/keys.ts is no longer provably pure.',
+      'A module-scope initialiser in src/config/defaults.ts is no longer provably pure.',
     )
     console.error('Check that each one is still annotated `/* @__PURE__ */`.')
     process.exit(1)
   }
 
-  console.log(`Root entry bundles to ${bytes} bytes for one import (budget ${BUDGET_BYTES}).`)
+  // Proves the pruning kept what the import actually needs.
+  globalThis.__in = 'utmTeamId'
+  const code = Buffer.from(result.outputFiles[0].contents).toString('utf-8')
+  await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)
+  if (globalThis.__out !== 'utm_team_id') {
+    console.error(`The pruned bundle returned ${JSON.stringify(globalThis.__out)} for 'utmTeamId'.`)
+    console.error('An annotated call was not pure, so a needed value was dropped.')
+    process.exit(1)
+  }
+
+  console.log(`Root entry bundles to ${bytes} bytes and still works (budget ${BUDGET_BYTES}).`)
 }
 
 await main()

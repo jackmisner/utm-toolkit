@@ -13,12 +13,12 @@
  * schedulers and process hooks a refactor would plausibly reach for, and a
  * before/after diff of the environment by value for everything else.
  *
- * Known gaps, in rough order of likelihood: synchronous filesystem work leaves
- * nothing to observe (the no-builtin-import check below covers that class at the
- * bundle level instead); an unhandled promise rejection at module scope needs the
- * event loop to turn and so is not seen; mutations to statics rather than
- * prototypes (`Object.assign = …`) are not snapshotted; and a symbol-keyed
- * addition to globalThis is not either, for the reason given at the snapshot.
+ * Known gaps: synchronous filesystem work leaves nothing to observe (the
+ * no-builtin-import check below covers that class at the bundle level instead),
+ * and an unhandled promise rejection at module scope needs the event loop to turn
+ * and so is not seen. The snapshot does not reach statics (`Object.assign = …`),
+ * prototypes outside WATCHED_PROTOTYPES (`Map.prototype.x = …`), process state
+ * beyond cwd and title, or symbol-keyed additions to globalThis.
  *
  * Usage: node scripts/assert-no-import-side-effects.js
  */
@@ -64,8 +64,10 @@ const WATCHED_PROTOTYPES = ['Object', 'Array', 'String', 'Number', 'Function', '
 
 /**
  * Imported before the traps go up, so their own evaluation is not attributed
- * here. Must stay in step with `external` in tsup.config.ts: an external missing
- * from this list has its side effects blamed on our entry.
+ * here. Must list every bare specifier the built entries import, subpaths
+ * included: tsup externalises `external` from its config plus every dependency
+ * and peerDependency, and an external missing from this list has its side
+ * effects blamed on our entry.
  */
 const EXTERNALS = ['react', 'react/jsx-runtime']
 
@@ -146,8 +148,8 @@ function snapshotEnvironment() {
 
   return {
     // String keys only: Node registers symbol-keyed internals on globalThis
-    // lazily (undici's dispatcher, with an incrementing counter), so reading the
-    // descriptors here would itself look like a change on the next snapshot.
+    // lazily (undici's dispatcher), so reading the descriptors here would itself
+    // look like a change on the next snapshot.
     globals: describeKeys(globalThis, Object.getOwnPropertyNames(globalThis)),
     prototypes,
     env: new Map(Object.entries(process.env)),
@@ -263,7 +265,7 @@ async function runProbe(target, format, outFile) {
   writeFileSync(outFile, JSON.stringify({ accesses, unprotected, failure, failureCode }))
 
   // A timer, socket or listener started during evaluation would otherwise keep
-  // this process alive and stall the parent instead of failing it.
+  // this process alive until the parent's 30s timeout.
   process.exit(0)
 }
 
@@ -281,7 +283,6 @@ function probe(target, format) {
   // reported against the package rather than against the debugger.
   const env = { ...process.env }
   delete env.NODE_DEBUG
-  delete env.NODE_DEBUG_NATIVE
 
   try {
     const result = spawnSync(process.execPath, [selfPath, '--probe', target, format, outFile], {
@@ -322,7 +323,8 @@ function probe(target, format) {
 /**
  * The check is worthless if the probe cannot report a side effect, and harmful if
  * it reports one that is not there, so prove both on every run. Returns the reason
- * it is untrustworthy, or null. Add a case here whenever a detector is added.
+ * it is untrustworthy, or null. Add a case here whenever a detector inside the
+ * probe is added; the builtin-import check runs in the parent and has none.
  */
 function selfTestFailure() {
   const dir = mkdtempSync(join(tmpdir(), 'utm-side-effects-'))

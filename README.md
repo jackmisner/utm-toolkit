@@ -51,6 +51,8 @@ Three entry points:
 
 All three ship dual ESM/CJS builds with TypeScript declarations. The `/react` and `/server` subpaths need TypeScript `moduleResolution` set to `node16` or `nodenext` (TS 4.7+), or `bundler` (TS 5.0+); under the legacy `node`/`node10` setting only the root entry resolves types, though all three resolve at runtime in Node.
 
+The root entry is a barrel, so for a browser bundle it matters how you import from it. esbuild and Rollup — and so Vite — cannot tree-shake CommonJS, so `const { toSnakeCase } = require('@jackmisner/utm-toolkit')` keeps the whole entry: roughly 28KB minified, against roughly 1.4KB for `import { toSnakeCase }` doing the same work. webpack 5 does prune unused CommonJS exports, and there the gap is under 1KB. A static `import` at the call site is the fix; `await import()` is not, because the namespace object is destructured at runtime and the bundler has to keep every export. The subpaths are far less exposed, because most of what they contain gets used either way: `/server` differs by a couple of hundred bytes, and `/react` by about 2.7KB on esbuild and under 500 bytes on webpack, against the ~14KB the hook pulls in regardless.
+
 ## Quick Start
 
 ### Basic Usage (Framework-Agnostic)
@@ -850,7 +852,7 @@ The browser defaults are lenient because losing a campaign label client-side is 
 
 `/server` does not import storage, form population, link decoration, debug helpers or React. That restriction is enforced by a test that walks the module's runtime import graph, not just documented — so the guarantee cannot be quietly removed by a convenient re-export.
 
-Note the honest framing: the root entry does **not** crash in Node. The reasons to use `/server` are the documented DOM-free surface, the server-appropriate defaults, the totality contract, and a smaller install/parse surface — the server bundle is roughly 5KB against the root entry's 52KB.
+Note the honest framing: the root entry does **not** crash in Node. The reasons to use `/server` are the documented DOM-free surface, the server-appropriate defaults, the totality contract, and a smaller install/parse surface — the published `/server` build is about 6KB against the root entry's 52KB. Those are raw file sizes in the package rather than what a consumer ships: a bundler prunes both, and almost all of `/server` is reachable from its own exports anyway.
 
 ## Configuration Options
 
@@ -942,6 +944,7 @@ import type {
 - The root entry is DOM-free at runtime — every `window` access sits behind a guard — so it imports and runs in Node without a DOM
 - `@jackmisner/utm-toolkit/server` is the supported surface for server use: it cannot reach storage or the DOM, and that restriction is enforced by a test rather than only documented
 - Types for the `/react` and `/server` subpaths need `moduleResolution` `node16`, `nodenext` or `bundler`; see [Installation](#installation)
+- A Node consumer is usually not bundling at all, so the import-style difference under [Installation](#installation) is parse cost on a long-lived process rather than download size — and `/server` carries no meaningful penalty either way
 
 ## Migration from Existing Projects
 

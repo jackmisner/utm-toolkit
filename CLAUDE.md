@@ -15,7 +15,7 @@
 - `validator.ts` has module-level mutable state (`defaultProtocol`). Tests that call `setDefaultProtocol()` must restore the original value.
 - The React hook freezes config at mount via `useRef` — config prop changes after mount are ignored.
 - All URL-facing operations convert keys to `snake_case` internally, regardless of the consumer's `keyFormat` setting.
-- `check:package` runs attw with `--profile node16`. The `node10` row fails for `/react` and `/server` because legacy resolution cannot see `exports` subpaths; that is a declared non-target, not a bug to fix. `typesVersions` would green the row for types only, so it was deliberately left out.
+- `check:package` runs attw with `--profile node16`. The `node10` row fails for `/react` and `/server` because legacy resolution cannot see `exports` subpaths; that is a declared non-target, not a bug to fix. Do not add `typesVersions`: it would green the row for types only.
 - publint and attw each catch what the other misses. attw exits 0 on a tarball containing no declarations at all, so publint is what catches missing or unpublished files; publint passes a correctly-wired `exports` map whose declarations import chunks the build never emitted, so attw is what catches that. Dropping either silently loses a class of failure.
 
 ## Releases

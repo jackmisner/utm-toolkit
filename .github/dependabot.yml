@@ -21,7 +21,8 @@ updates:
   # npm dependencies (published dual ESM/CJS library).
   #   * minor + patch → grouped into ONE weekly PR.
   #   * major bumps are deliberately NOT grouped — Dependabot raises one PR per
-  #     major so each can be triaged on its own (breaking changes / migrations).
+  #     major so each can be triaged on its own (breaking changes / migrations),
+  #     except the lockstep and pre-1.0 tool families grouped below.
   #     A grouped batch must never be blocked by one incompatible major.
   #
   # Every dependency here is a devDependency (the package has zero runtime
@@ -79,11 +80,11 @@ updates:
         patterns:
           - "vitest"
           - "@vitest/*"
-      # publint and @arethetypeswrong/cli are both pre-1.0, so a breaking
-      # change arrives as a minor that Dependabot classifies as `minor` by
-      # numeric component. Either tool can add a rule that fails
-      # `npm run check:package` against unchanged package code, so they move in
-      # their own PR rather than reddening the grouped bump and blocking it.
+      # publint and @arethetypeswrong/cli are both pre-1.0, so breaking changes
+      # ship as minors. Either tool can add a rule that fails
+      # `npm run check:package` against unchanged package code, and in the
+      # grouped minor/patch PR that would block every unrelated bump behind it.
+      # This group covers ALL update types, majors included.
       package-check:
         patterns:
           - "publint"

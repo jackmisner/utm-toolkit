@@ -79,6 +79,15 @@ updates:
         patterns:
           - "vitest"
           - "@vitest/*"
+      # publint and @arethetypeswrong/cli are both pre-1.0, so a breaking
+      # change arrives as a minor that Dependabot classifies as `minor` by
+      # numeric component. Either tool can add a rule that fails
+      # `npm run check:package` against unchanged package code, so they move in
+      # their own PR rather than reddening the grouped bump and blocking it.
+      package-check:
+        patterns:
+          - "publint"
+          - "@arethetypeswrong/*"
       npm-minor-patch:
         patterns:
           - "*"

@@ -41,9 +41,6 @@ jobs:
           NODE_ENV: test
         run: npm test
 
-      - name: Build package
-        run: npm run build
-
       - name: Check package exports and declarations
         run: npm run check:package
 

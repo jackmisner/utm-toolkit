@@ -3,6 +3,9 @@ name: Package check
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   package-check:
     runs-on: ubuntu-latest

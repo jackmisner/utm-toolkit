@@ -60,15 +60,20 @@ export const DEFAULT_PII_PATTERNS: PiiPattern[] = [
   },
 ]
 
+/** Built in a function for the same reason as createDefaultConfig below. */
+function createPiiFilterConfig(): PiiFilterConfig {
+  return {
+    enabled: false,
+    mode: 'reject',
+    patterns: [...DEFAULT_PII_PATTERNS],
+  }
+}
+
 /**
  * Default PII filtering configuration
  * PII filtering is disabled by default but has sensible defaults when enabled
  */
-export const DEFAULT_PII_FILTER_CONFIG: PiiFilterConfig = {
-  enabled: false,
-  mode: 'reject',
-  patterns: [...DEFAULT_PII_PATTERNS],
-}
+export const DEFAULT_PII_FILTER_CONFIG: PiiFilterConfig = /* @__PURE__ */ createPiiFilterConfig()
 
 /**
  * Standard UTM parameters (snake_case format for URLs)
@@ -83,52 +88,62 @@ export const STANDARD_UTM_PARAMETERS = [
 ] as const
 
 /**
+ * Built in a function so the annotation on the export below has a call to attach
+ * to. esbuild and Rolldown cannot prove a spread pure, Rollup can, so without it
+ * this object is retained for an esbuild or Rolldown consumer at about a
+ * kilobyte. scripts/assert-bundle-budget.js fails if the annotation is lost.
+ */
+function createDefaultConfig(): ResolvedUtmConfig {
+  return {
+    /** UTM tracking is enabled by default */
+    enabled: true,
+
+    /** Use snake_case format by default (matches URL query params) */
+    keyFormat: 'snake_case',
+
+    /** Default storage key for browser storage */
+    storageKey: 'utm_parameters',
+
+    /** Use sessionStorage by default (ephemeral, cleared on tab close) */
+    storageType: 'session',
+
+    /** Auto-capture UTM params when React hook mounts */
+    captureOnMount: true,
+
+    /** Append UTM params to share URLs by default */
+    appendToShares: true,
+
+    /** Capture standard UTM parameters by default */
+    allowedParameters: [...STANDARD_UTM_PARAMETERS],
+
+    /** Values are not folded to lowercase by default */
+    lowercaseValues: false,
+
+    /** No default parameters set */
+    defaultParams: {},
+
+    /** No platform-specific share context by default */
+    shareContextParams: {},
+
+    /** No parameters excluded from shares by default */
+    excludeFromShares: [],
+
+    /** Sanitization disabled by default */
+    sanitize: { ...DEFAULT_SANITIZE_CONFIG },
+
+    /** PII filtering disabled by default (deep copy to prevent shared references) */
+    piiFiltering: { ...DEFAULT_PII_FILTER_CONFIG, patterns: [...DEFAULT_PII_PATTERNS] },
+
+    /** Last-touch attribution by default */
+    attribution: { ...DEFAULT_ATTRIBUTION_CONFIG },
+  }
+}
+
+/**
  * Default configuration with all values set
  * This is used as the base when merging with user-provided config
  */
-export const DEFAULT_CONFIG: ResolvedUtmConfig = {
-  /** UTM tracking is enabled by default */
-  enabled: true,
-
-  /** Use snake_case format by default (matches URL query params) */
-  keyFormat: 'snake_case',
-
-  /** Default storage key for browser storage */
-  storageKey: 'utm_parameters',
-
-  /** Use sessionStorage by default (ephemeral, cleared on tab close) */
-  storageType: 'session',
-
-  /** Auto-capture UTM params when React hook mounts */
-  captureOnMount: true,
-
-  /** Append UTM params to share URLs by default */
-  appendToShares: true,
-
-  /** Capture standard UTM parameters by default */
-  allowedParameters: [...STANDARD_UTM_PARAMETERS],
-
-  /** Values are not folded to lowercase by default */
-  lowercaseValues: false,
-
-  /** No default parameters set */
-  defaultParams: {},
-
-  /** No platform-specific share context by default */
-  shareContextParams: {},
-
-  /** No parameters excluded from shares by default */
-  excludeFromShares: [],
-
-  /** Sanitization disabled by default */
-  sanitize: { ...DEFAULT_SANITIZE_CONFIG },
-
-  /** PII filtering disabled by default (deep copy to prevent shared references) */
-  piiFiltering: { ...DEFAULT_PII_FILTER_CONFIG, patterns: [...DEFAULT_PII_PATTERNS] },
-
-  /** Last-touch attribution by default */
-  attribution: { ...DEFAULT_ATTRIBUTION_CONFIG },
-}
+export const DEFAULT_CONFIG: ResolvedUtmConfig = /* @__PURE__ */ createDefaultConfig()
 
 /**
  * Get a copy of the default configuration

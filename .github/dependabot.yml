@@ -80,11 +80,10 @@ updates:
         patterns:
           - "vitest"
           - "@vitest/*"
-      # publint and @arethetypeswrong/cli are both pre-1.0, so breaking changes
-      # ship as minors. Either tool can add a rule that fails
-      # `npm run check:package` against unchanged package code, and in the
-      # grouped minor/patch PR that would block every unrelated bump behind it.
-      # This group covers ALL update types, majors included.
+      # publint and @arethetypeswrong/cli are pre-1.0, so breaking changes ship
+      # as minors; either can start failing `npm run check:package` against
+      # unchanged package code. This group covers ALL update types, majors
+      # included, so such a bump cannot block the grouped batch behind it.
       package-check:
         patterns:
           - "publint"

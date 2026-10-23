@@ -49,7 +49,7 @@ Three entry points:
 | `@jackmisner/utm-toolkit/react` | Hook, provider and components (needs React) |
 | `@jackmisner/utm-toolkit/server` | DOM-free normalization for ingest endpoints |
 
-All three ship dual ESM/CJS builds with TypeScript declarations. The `/react` and `/server` subpaths need TypeScript `moduleResolution` set to `node16` or `nodenext` (TS 4.7+), or `bundler` (TS 5.0+); under the legacy `node`/`node10` setting only the root entry resolves types, though all three resolve at runtime.
+All three ship dual ESM/CJS builds with TypeScript declarations. The `/react` and `/server` subpaths need TypeScript `moduleResolution` set to `node16` or `nodenext` (TS 4.7+), or `bundler` (TS 5.0+); under the legacy `node`/`node10` setting only the root entry resolves types, though all three resolve at runtime in Node.
 
 ## Quick Start
 

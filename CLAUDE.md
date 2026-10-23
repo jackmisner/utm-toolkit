@@ -17,6 +17,8 @@
 - All URL-facing operations convert keys to `snake_case` internally, regardless of the consumer's `keyFormat` setting.
 - `check:package` runs attw with `--profile node16`, so the `node10` row is still printed but every cell is marked `(ignored)` and it cannot affect the exit code. It is red for `/react` and `/server` because legacy resolution cannot see `exports` subpaths; that is a declared non-target, not a bug to fix. Do not add `typesVersions`: it would green the row for types only.
 - publint and attw each catch what the other misses. attw exits 0 on a tarball containing no declarations at all, so publint is what catches missing or unpublished files; publint passes a correctly-wired `exports` map whose declarations import chunks the build never emitted, so attw is what catches that. Dropping either silently loses a class of failure.
+- `scripts/assert-no-import-side-effects.js` guards `"sideEffects": false` in `check:package`, and nothing else verifies that claim. It fails a module-scope *read* of a browser global, not only a write, and fails any entry that imports a node builtin, since it cannot see what such code does at import; no entry needs one today. Detect the environment at call time, as every site in `src/` does; the script header gives the reasoning.
+- The flag saves a consumer bytes only when none of an entry's exports are used. `sideEffects` is module-granularity and `splitting: false` emits each entry as a single JS module, so there is no partial drop. Do not advertise it as a tree-shaking win.
 
 ## Releases
 

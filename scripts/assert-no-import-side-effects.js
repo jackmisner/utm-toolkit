@@ -23,8 +23,9 @@ const selfPath = fileURLToPath(import.meta.url)
 
 /**
  * Read or assignment of any of these during module evaluation fails the check.
- * Reads are included deliberately: a module-scope read means environment
- * detection at import time, which breaks the SSR-safety the README claims.
+ * Reads fail too, not only writes: `window.location` at module scope throws on a
+ * server, and this trap cannot tell that from a harmless `typeof window`. Detect
+ * the environment at call time, as every site in src/ does.
  */
 const TRAPPED_GLOBALS = [
   'window',

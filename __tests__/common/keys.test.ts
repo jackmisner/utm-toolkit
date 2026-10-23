@@ -12,6 +12,10 @@ import {
   detectKeyFormat,
   normalizeKey,
   toUrlKey,
+  SNAKE_TO_CAMEL,
+  CAMEL_TO_SNAKE,
+  STANDARD_SNAKE_KEYS,
+  STANDARD_CAMEL_KEYS,
 } from '../../src/common/keys'
 
 describe('toSnakeCase', () => {
@@ -243,5 +247,19 @@ describe('isValidUtmParameters', () => {
   it('accepts either format when format not specified', () => {
     expect(isValidUtmParameters({ utm_source: 'test' })).toBe(true)
     expect(isValidUtmParameters({ utmSource: 'test' })).toBe(true)
+  })
+})
+
+/**
+ * These lists are derived from the maps above them. Pinning the relationship
+ * keeps a literal rewrite of either from drifting out of step.
+ */
+describe('standard key lists match the maps they come from', () => {
+  it('STANDARD_SNAKE_KEYS lists the keys of SNAKE_TO_CAMEL', () => {
+    expect(STANDARD_SNAKE_KEYS).toEqual(Object.keys(SNAKE_TO_CAMEL))
+  })
+
+  it('STANDARD_CAMEL_KEYS lists the keys of CAMEL_TO_SNAKE', () => {
+    expect(STANDARD_CAMEL_KEYS).toEqual(Object.keys(CAMEL_TO_SNAKE))
   })
 })

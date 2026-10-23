@@ -1,25 +1,23 @@
-#!/usr/bin/env node
-
 /**
  * Fails if a consumer importing one small function from the root entry would
- * ship more than BUDGET_BYTES.
+ * ship more than BUDGET_BYTES, or if the pruned bundle does not work.
  *
- * What this protects is a `/* @__PURE__ *\/` annotation on each module-scope
- * initialiser in src/config/defaults.ts. A bundler needs those to prove
- * DEFAULT_CONFIG droppable; without one it retains the whole object and its
- * dependencies, which measures ~1,200 bytes against ~300. They are comments, so
- * removing one costs every consumer about a kilobyte and changes nothing any
- * test can see.
+ * What this protects is the `@__PURE__` annotation on each exported default in
+ * src/config/defaults.ts. A bundler needs one to prove the object droppable,
+ * and cannot prove a spread pure by itself, which is why those objects are
+ * built by a factory call. Losing an annotation retains the whole object and
+ * everything it reaches: ~1,200 bytes against ~300, with nothing any test can
+ * see.
  *
- * It does NOT cover the two annotations in src/common/keys.ts, which are worth
- * 153 and 21 bytes: catching the 21 would need a ceiling with no headroom at
- * all. A breach therefore always points at defaults.ts.
+ * It does not cover the two annotations in src/common/keys.ts, worth 153 and 21
+ * bytes to this import. Catching the 21 would need a ceiling with no headroom,
+ * so a breach here always points at defaults.ts.
  *
  * The bundle is executed as well as weighed, because an annotation on a call
  * that is not in fact pure would license a bundler to drop something needed,
- * and no test here bundles anything.
+ * and nothing else here bundles anything.
  *
- * Usage: node scripts/assert-bundle-budget.js
+ * Usage: npm run check:package (which builds first)
  */
 
 import { build } from 'esbuild'

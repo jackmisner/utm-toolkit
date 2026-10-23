@@ -49,7 +49,7 @@ Three entry points:
 | `@jackmisner/utm-toolkit/react` | Hook, provider and components (needs React) |
 | `@jackmisner/utm-toolkit/server` | DOM-free normalization for ingest endpoints |
 
-All three ship dual ESM/CJS builds with TypeScript declarations.
+All three ship dual ESM/CJS builds with TypeScript declarations. The `/react` and `/server` subpaths need TypeScript `moduleResolution` set to `node16` or `nodenext` (TS 4.7+), or `bundler` (TS 5.0+); under the legacy `node`/`node10` setting only the root entry resolves types, though all three resolve at runtime in Node.
 
 ## Quick Start
 
@@ -941,6 +941,7 @@ import type {
 - `engines.node` is `>=20.0.0`; CI exercises 22, 24 and 26
 - The root entry is DOM-free at runtime — every `window` access sits behind a guard — so it imports and runs in Node without a DOM
 - `@jackmisner/utm-toolkit/server` is the supported surface for server use: it cannot reach storage or the DOM, and that restriction is enforced by a test rather than only documented
+- Types for the `/react` and `/server` subpaths need `moduleResolution` `node16`, `nodenext` or `bundler`; see [Installation](#installation)
 
 ## Migration from Existing Projects
 

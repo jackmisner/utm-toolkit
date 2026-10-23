@@ -38,6 +38,7 @@
       }
     }
   },
+  "sideEffects": false,
   "files": [
     "dist",
     "README.md",
@@ -50,7 +51,7 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "type-check": "tsc --noEmit",
-    "check:package": "npm run build && publint --strict && attw --pack . --profile node16",
+    "check:package": "npm run build && publint --strict && attw --pack . --profile node16 && node scripts/assert-no-import-side-effects.js",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\"",

@@ -17,6 +17,8 @@
 - All URL-facing operations convert keys to `snake_case` internally, regardless of the consumer's `keyFormat` setting.
 - `check:package` runs attw with `--profile node16`, so the `node10` row is still printed but every cell is marked `(ignored)` and it cannot affect the exit code. It is red for `/react` and `/server` because legacy resolution cannot see `exports` subpaths; that is a declared non-target, not a bug to fix. Do not add `typesVersions`: it would green the row for types only.
 - publint and attw each catch what the other misses. attw exits 0 on a tarball containing no declarations at all, so publint is what catches missing or unpublished files; publint passes a correctly-wired `exports` map whose declarations import chunks the build never emitted, so attw is what catches that. Dropping either silently loses a class of failure.
+- `"sideEffects": false` is a claim about the built output that neither publint nor attw checks, and the unit tests only import from `src/`. `scripts/assert-no-import-side-effects.js` is what guards it: it imports every published entry in a child process with the browser globals, `console` and the stream writers trapped. Module-scope *reads* fail too, not only writes, because environment detection at import time breaks the SSR-safety the README claims. It self-tests against a generated impure module on every run; keep that, a probe that cannot fail is worse than none.
+- The flag saves a consumer no bytes today. `splitting: false` emits each entry as one self-contained module, and `sideEffects` is module-granularity, so there is nothing for it to drop; it is there to be true, and to pay off if splitting is ever enabled.
 
 ## Releases
 

@@ -30,7 +30,6 @@ describe('exported defaults are independent of each other', () => {
     expect(DEFAULT_CONFIG.piiFiltering.patterns).toEqual(DEFAULT_PII_PATTERNS)
   })
 
-  /** The spread these replaced copied the array but shared its member objects. */
   it('copies the patterns array without copying the patterns themselves', () => {
     expect(DEFAULT_CONFIG.piiFiltering.patterns[0]).toBe(DEFAULT_PII_PATTERNS[0])
   })

@@ -60,10 +60,6 @@ export const DEFAULT_PII_PATTERNS: PiiPattern[] = [
   },
 ]
 
-/**
- * Default PII filtering configuration
- * PII filtering is disabled by default but has sensible defaults when enabled
- */
 /** Built in a function for the same reason as createDefaultConfig below. */
 function createPiiFilterConfig(): PiiFilterConfig {
   return {
@@ -73,6 +69,10 @@ function createPiiFilterConfig(): PiiFilterConfig {
   }
 }
 
+/**
+ * Default PII filtering configuration
+ * PII filtering is disabled by default but has sensible defaults when enabled
+ */
 export const DEFAULT_PII_FILTER_CONFIG: PiiFilterConfig = /* @__PURE__ */ createPiiFilterConfig()
 
 /**
@@ -88,14 +88,10 @@ export const STANDARD_UTM_PARAMETERS = [
 ] as const
 
 /**
- * Default configuration with all values set
- * This is used as the base when merging with user-provided config
- */
-/**
- * Built in a function so the annotation on the export below has a call to
- * attach to. A bundler cannot prove an object or array spread pure, so without
- * it this object is retained for every consumer, at about a kilobyte.
- * scripts/assert-bundle-budget.js fails if the annotation is lost.
+ * Built in a function so the annotation on the export below has a call to attach
+ * to. esbuild and Rolldown cannot prove a spread pure, Rollup can, so without it
+ * this object is retained for an esbuild or Rolldown consumer at about a
+ * kilobyte. scripts/assert-bundle-budget.js fails if the annotation is lost.
  */
 function createDefaultConfig(): ResolvedUtmConfig {
   return {
@@ -143,6 +139,10 @@ function createDefaultConfig(): ResolvedUtmConfig {
   }
 }
 
+/**
+ * Default configuration with all values set
+ * This is used as the base when merging with user-provided config
+ */
 export const DEFAULT_CONFIG: ResolvedUtmConfig = /* @__PURE__ */ createDefaultConfig()
 
 /**

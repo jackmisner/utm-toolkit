@@ -2,20 +2,20 @@
  * Fails if a consumer importing one small function from the root entry would
  * ship more than BUDGET_BYTES, or if the pruned bundle does not work.
  *
- * What this protects is the `@__PURE__` annotation on each exported default in
- * src/config/defaults.ts. A bundler needs one to prove the object droppable,
- * and cannot prove a spread pure by itself, which is why those objects are
- * built by a factory call. Losing an annotation retains the whole object and
- * everything it reaches: ~1,200 bytes against ~300, with nothing any test can
- * see.
+ * What this protects is the two `@__PURE__` annotations in
+ * src/config/defaults.ts, on the factory calls that build
+ * DEFAULT_PII_FILTER_CONFIG and DEFAULT_CONFIG. The comment above
+ * createDefaultConfig says why they are written that way. Losing either retains
+ * the object and everything it reaches - ~670 or ~1,200 bytes against ~300 -
+ * with nothing any test can see.
  *
  * It does not cover the two annotations in src/common/keys.ts, worth 153 and 21
  * bytes to this import. Catching the 21 would need a ceiling with no headroom,
- * so a breach here always points at defaults.ts.
+ * so a breach here is most likely one of the defaults.ts pair.
  *
  * The bundle is executed as well as weighed, because an annotation on a call
  * that is not in fact pure would license a bundler to drop something needed,
- * and nothing else here bundles anything.
+ * and no other check prunes the entry and runs the result.
  *
  * Usage: npm run check:package (which builds first)
  */
@@ -29,8 +29,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = resolve(__dirname, '..')
 
 /**
- * ~300 bytes with every defaults.ts initialiser annotated, ~1,200 with any one
- * of them lost. The headroom absorbs ordinary growth in the function under test
+ * ~300 bytes with both defaults.ts annotations in place, ~670 or ~1,200 with
+ * either lost. The headroom absorbs ordinary growth in the function under test
  * and patch-level minifier drift.
  */
 const BUDGET_BYTES = 600
@@ -69,10 +69,8 @@ async function main() {
     console.error(
       `Importing { ${SYMBOL} } from the root entry now bundles to ${bytes} bytes, over the ${BUDGET_BYTES} budget.`,
     )
-    console.error(
-      'A module-scope initialiser in src/config/defaults.ts is no longer provably pure.',
-    )
-    console.error('Check that each one is still annotated `/* @__PURE__ */`.')
+    console.error('Most likely a factory call in src/config/defaults.ts lost its annotation.')
+    console.error('DEFAULT_PII_FILTER_CONFIG and DEFAULT_CONFIG each need one.')
     process.exit(1)
   }
 

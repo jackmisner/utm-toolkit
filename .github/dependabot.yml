@@ -81,7 +81,7 @@ updates:
           - "vitest"
           - "@vitest/*"
       # publint, @arethetypeswrong/cli and esbuild are pre-1.0, so breaking changes ship
-      # as minors; either can start failing `npm run check:package` against
+      # as minors; any of them can start failing `npm run check:package` against
       # unchanged package code. This group covers ALL update types, majors
       # included, so such a bump cannot block the grouped batch behind it.
       package-check:

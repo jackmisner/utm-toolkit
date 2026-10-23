@@ -9,17 +9,22 @@
  * exercises the built artifacts' import behaviour.
  *
  * Detection is deliberately belt-and-braces, because no single mechanism covers
- * the ways module evaluation can be observable: named traps for the globals and
- * schedulers a refactor would plausibly reach for, and a before/after diff of the
- * environment for everything else. What is NOT detected is synchronous
- * filesystem work (`fs.writeFileSync` leaves no trace); the no-builtin-imports
- * assertion below covers that class at the bundle level instead.
+ * the ways module evaluation can be observable: named traps for the globals,
+ * schedulers and process hooks a refactor would plausibly reach for, and a
+ * before/after diff of the environment by value for everything else.
+ *
+ * Known gaps, in rough order of likelihood: synchronous filesystem work leaves
+ * nothing to observe (the no-builtin-import check below covers that class at the
+ * bundle level instead); an unhandled promise rejection at module scope needs the
+ * event loop to turn and so is not seen; mutations to statics rather than
+ * prototypes (`Object.assign = …`) are not snapshotted; and a symbol-keyed
+ * addition to globalThis is not either, for the reason given at the snapshot.
  *
  * Usage: node scripts/assert-no-import-side-effects.js
  */
 
 import { spawnSync } from 'child_process'
-import { createRequire } from 'module'
+import { builtinModules, createRequire } from 'module'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { dirname, join, resolve } from 'path'
@@ -54,7 +59,7 @@ const TRAPPED_GLOBALS = [
 const TRAPPED_SCHEDULERS = ['setTimeout', 'setInterval', 'setImmediate', 'queueMicrotask']
 const TRAPPED_PROCESS_METHODS = ['nextTick', 'on', 'once', 'addListener', 'prependListener']
 
-/** Patching any of these is a side effect the environment diff reports by name. */
+/** Prototypes whose keys are compared by value, so replacement and deletion show up. */
 const WATCHED_PROTOTYPES = ['Object', 'Array', 'String', 'Number', 'Function', 'Promise', 'Date']
 
 /**
@@ -66,18 +71,25 @@ const EXTERNALS = ['react', 'react/jsx-runtime']
 
 /** Extensions this script knows how to load; anything else must not be skipped silently. */
 const LOADABLE = ['.js', '.cjs', '.mjs']
-const NOT_RUNTIME = /\.(d\.ts|d\.cts|d\.mts|map)$/
-
-const BUILTIN_IMPORT = new RegExp(
-  String.raw`(?:from|require\()\s*['"](?:node:)?` +
-    '(fs|http|https|net|path|os|child_process|crypto|stream|zlib|dns|tls|worker_threads|vm|module)' +
-    String.raw`['"]`,
-)
+const NOT_RUNTIME = /\.(d\.ts|d\.cts|d\.mts|map|json)$/
+const BUILTINS = new Set(builtinModules)
+const SPECIFIER = /(?:\bfrom|\brequire|\bimport)\s*\(?\s*['"]([^'"]+)['"]/g
 
 function countByType(values) {
   const counts = {}
   for (const value of values) counts[value] = (counts[value] ?? 0) + 1
   return counts
+}
+
+/** Node builtins a bundle imports, by root name. `node:fs/promises` reports as `fs`. */
+function builtinImports(source) {
+  const found = new Set()
+  for (const [, specifier] of source.matchAll(SPECIFIER)) {
+    const bare = specifier.startsWith('node:') ? specifier.slice(5) : specifier
+    const rootName = bare.split('/')[0]
+    if (BUILTINS.has(rootName)) found.add(rootName)
+  }
+  return [...found]
 }
 
 function collectEntries(exportsMap) {
@@ -96,35 +108,73 @@ function collectEntries(exportsMap) {
   const entries = []
   const unknown = []
   for (const path of [...paths].sort()) {
-    if (NOT_RUNTIME.test(path)) continue
+    // A wildcard subpath is a pattern, not a module, and package.json is data.
+    if (path.includes('*') || NOT_RUNTIME.test(path)) continue
     if (LOADABLE.some((extension) => path.endsWith(extension))) entries.push(path)
     else unknown.push(path)
   }
   return { entries, unknown }
 }
 
+/**
+ * Identity token for a property, read from its descriptor so that an accessor's
+ * getter is never invoked — the traps installed below are accessors, and reading
+ * them would record a side effect against the module under test.
+ */
+function describeKeys(target, keys) {
+  const tokens = new Map()
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(target, key)
+    if (!descriptor) continue
+    const name = typeof key === 'symbol' ? `@@${String(key)}` : key
+    tokens.set(name, 'get' in descriptor && descriptor.get ? descriptor.get : descriptor.value)
+  }
+  return tokens
+}
+
 /** Snapshot taken after the traps are installed, so the traps are not reported as changes. */
 function snapshotEnvironment() {
+  const prototypes = new Map()
+  for (const name of WATCHED_PROTOTYPES) {
+    const prototype = globalThis[name]?.prototype
+    if (!prototype) continue
+    for (const [key, token] of describeKeys(prototype, Reflect.ownKeys(prototype))) {
+      prototypes.set(`${name}.${key}`, token)
+    }
+    prototypes.set(`${name} frozen`, Object.isFrozen(prototype))
+  }
+
   return {
-    globals: Object.getOwnPropertyNames(globalThis),
-    env: Object.entries(process.env).map(([key, value]) => `${key}=${value}`),
-    prototypes: WATCHED_PROTOTYPES.flatMap((name) =>
-      Object.getOwnPropertyNames(globalThis[name].prototype).map((key) => `${name}.${key}`),
-    ),
+    // String keys only: Node registers symbol-keyed internals on globalThis
+    // lazily (undici's dispatcher, with an incrementing counter), so reading the
+    // descriptors here would itself look like a change on the next snapshot.
+    globals: describeKeys(globalThis, Object.getOwnPropertyNames(globalThis)),
+    prototypes,
+    env: new Map(Object.entries(process.env)),
+    processState: new Map([
+      ['cwd', process.cwd()],
+      ['title', process.title],
+    ]),
     resources: countByType(process.getActiveResourcesInfo()),
   }
 }
 
 function diffEnvironment(before, after) {
   const changes = []
-  const added = (label, from, to) => {
-    const known = new Set(from)
-    for (const value of to) if (!known.has(value)) changes.push(`${label} ${value}`)
+
+  const compare = (label, from, to) => {
+    for (const [key, token] of to) {
+      // Object.is, not ===, so the NaN global does not read as replaced every run.
+      if (!from.has(key)) changes.push(`${label} added ${key}`)
+      else if (!Object.is(from.get(key), token)) changes.push(`${label} replaced ${key}`)
+    }
+    for (const key of from.keys()) if (!to.has(key)) changes.push(`${label} removed ${key}`)
   }
 
-  added('added global', before.globals, after.globals)
-  added('changed process.env', before.env, after.env)
-  added('patched', before.prototypes, after.prototypes)
+  compare('global', before.globals, after.globals)
+  compare('prototype', before.prototypes, after.prototypes)
+  compare('process.env', before.env, after.env)
+  compare('process state', before.processState, after.processState)
 
   for (const [type, count] of Object.entries(after.resources)) {
     const extra = count - (before.resources[type] ?? 0)
@@ -164,10 +214,13 @@ async function runProbe(target, format, outFile) {
     }
   }
 
+  // Shaped like a Timeout so a module that stores and unrefs the handle still
+  // reaches the end of its evaluation, rather than also reporting an import error.
+  const handle = { unref: () => handle, ref: () => handle, hasRef: () => false, close: () => {} }
   for (const name of TRAPPED_SCHEDULERS) {
     globalThis[name] = () => {
       accesses.push(`${name}()`)
-      return undefined
+      return handle
     }
   }
 
@@ -224,10 +277,11 @@ function probe(target, format) {
   const dir = mkdtempSync(join(tmpdir(), 'utm-probe-'))
   const outFile = join(dir, 'result.json')
 
-  // NODE_DEBUG=module makes Node log through the trapped stderr writer, which
-  // would be reported against the package rather than against the debugger.
+  // NODE_DEBUG makes Node log through the trapped stderr writer, which would be
+  // reported against the package rather than against the debugger.
   const env = { ...process.env }
   delete env.NODE_DEBUG
+  delete env.NODE_DEBUG_NATIVE
 
   try {
     const result = spawnSync(process.execPath, [selfPath, '--probe', target, format, outFile], {
@@ -241,7 +295,8 @@ function probe(target, format) {
     try {
       parsed = JSON.parse(readFileSync(outFile, 'utf-8'))
     } catch {
-      const detail = result.stderr?.trim() || result.stdout?.trim() || 'no output'
+      const detail =
+        result.error?.message || result.stderr?.trim() || result.stdout?.trim() || 'no output'
       return {
         accesses: [],
         unprotected: [],
@@ -265,14 +320,15 @@ function probe(target, format) {
 }
 
 /**
- * The check is worthless if the probe cannot report a side effect, so prove on
- * every run that each detector fires. Returns the reason it is untrustworthy, or
- * null. Add a case here whenever a detector is added.
+ * The check is worthless if the probe cannot report a side effect, and harmful if
+ * it reports one that is not there, so prove both on every run. Returns the reason
+ * it is untrustworthy, or null. Add a case here whenever a detector is added.
  */
 function selfTestFailure() {
   const dir = mkdtempSync(join(tmpdir(), 'utm-side-effects-'))
   try {
     const cases = [
+      ['module.exports = 1\n', []],
       ["console.log('x')\n", ['console.log()']],
       ["process.stdout.write('x')\n", ['process.stdout.write()']],
       ['const read = sessionStorage\n', ['read sessionStorage']],
@@ -280,27 +336,40 @@ function selfTestFailure() {
       ['setInterval(() => {}, 1000)\n', ['setInterval()']],
       ['queueMicrotask(() => {})\n', ['queueMicrotask()']],
       ["process.on('exit', () => {})\n", ['process.on()']],
-      ['globalThis.__utmProbeMarker = 1\n', ['added global __utmProbeMarker']],
-      ["process.env.UTM_PROBE_MARKER = '1'\n", ['changed process.env UTM_PROBE_MARKER=1']],
-      ['Array.prototype.__utmProbeMarker = 1\n', ['patched Array.__utmProbeMarker']],
+      ['globalThis.__utmProbeMarker = 1\n', ['global added __utmProbeMarker']],
+      ['globalThis.structuredClone = () => null\n', ['global replaced structuredClone']],
+      ["process.env.UTM_PROBE_MARKER = '1'\n", ['process.env added UTM_PROBE_MARKER']],
+      ['Array.prototype.__utmProbeMarker = 1\n', ['prototype added Array.__utmProbeMarker']],
+      ['Array.prototype.includes = function () {}\n', ['prototype replaced Array.includes']],
+      ['delete Array.prototype.at\n', ['prototype removed Array.at']],
+      ['Object.freeze(Date.prototype)\n', ['prototype replaced Date frozen']],
+      ["process.chdir('/')\n", ['process state replaced cwd']],
       ["require('fs').writeSync(1, 'x')\n", ['straight to stdout']],
+      ["require('node:timers').setInterval(() => {}, 1000)\n", ['active Timeout handle']],
     ]
 
     let index = 0
     for (const [body, expectations] of cases) {
       index += 1
-      // Each case runs as CJS so `require` is available to the stdout-bypass case.
-      const file = join(dir, `impure-${index}.cjs`)
+      // Each case runs as CJS so `require` is available to the bypass cases.
+      const file = join(dir, `case-${index}.cjs`)
       writeFileSync(file, body)
       const { accesses, unprotected, failure } = probe(file, 'cjs')
 
-      if (failure) return `probing known-impure case ${index} errored: ${failure}`
+      if (failure) return `probing self-test case ${index} errored: ${failure}`
       if (unprotected.length > 0) {
         return `could not trap ${unprotected.join(', ')}, so the check is incomplete`
       }
+
+      if (expectations.length === 0) {
+        if (accesses.length > 0) {
+          return `the probe reports side effects for a module that has none (${accesses.join(', ')}), so this environment is too noisy to judge the package`
+        }
+        continue
+      }
       for (const expected of expectations) {
         if (!accesses.some((access) => access.includes(expected))) {
-          return `probe missed "${expected}" in known-impure case ${index} (saw: ${accesses.join(', ') || 'nothing'})`
+          return `probe missed "${expected}" in self-test case ${index} (saw: ${accesses.join(', ') || 'nothing'})`
         }
       }
     }
@@ -318,9 +387,7 @@ function main() {
     console.error(
       `Cannot probe these entry points, so they would go unchecked: ${unknown.join(', ')}`,
     )
-    console.error(
-      `Teach LOADABLE in ${'scripts/assert-no-import-side-effects.js'} how to load them.`,
-    )
+    console.error('Teach LOADABLE in this script how to load them.')
     process.exit(1)
   }
   if (entries.length === 0) {
@@ -354,17 +421,16 @@ function main() {
       problems.push(`${entry}: could not be imported (${failure}).${hint}`)
     }
 
-    const source = (() => {
-      try {
-        return readFileSync(target, 'utf-8')
-      } catch {
-        return ''
-      }
-    })()
-    const builtin = source.match(BUILTIN_IMPORT)
-    if (builtin) {
+    let source = ''
+    try {
+      source = readFileSync(target, 'utf-8')
+    } catch {
+      // Already reported as an import failure above.
+    }
+    const builtins = builtinImports(source)
+    if (builtins.length > 0) {
       problems.push(
-        `${entry}: imports the node builtin "${builtin[1]}", whose calls this check cannot see.`,
+        `${entry}: imports the node builtin(s) ${builtins.join(', ')}, whose calls this check cannot see.`,
       )
     }
   }

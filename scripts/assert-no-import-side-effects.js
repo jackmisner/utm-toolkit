@@ -223,11 +223,18 @@ async function runProbe(target, format, outFile) {
 function probe(target, format) {
   const dir = mkdtempSync(join(tmpdir(), 'utm-probe-'))
   const outFile = join(dir, 'result.json')
+
+  // NODE_DEBUG=module makes Node log through the trapped stderr writer, which
+  // would be reported against the package rather than against the debugger.
+  const env = { ...process.env }
+  delete env.NODE_DEBUG
+
   try {
     const result = spawnSync(process.execPath, [selfPath, '--probe', target, format, outFile], {
       encoding: 'utf-8',
       cwd: root,
       timeout: 30_000,
+      env,
     })
 
     let parsed

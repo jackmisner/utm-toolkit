@@ -50,6 +50,7 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "type-check": "tsc --noEmit",
+    "check:package": "npm run build && publint --strict && attw --pack . --profile node16",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\"",
@@ -68,12 +69,14 @@
     }
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@testing-library/react": "^16.0.0",
     "@types/react": "^18.0.0",
     "@vitest/coverage-v8": "^5.0.0",
     "jsdom": "^30.0.1",
     "oxlint": "^1.0.0",
     "prettier": "^3.0.0",
+    "publint": "^0.3.25",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "tsup": "^8.5.1",
@@ -93,7 +96,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jackmisner/utm-toolkit.git"
+    "url": "git+https://github.com/jackmisner/utm-toolkit.git"
   },
   "author": "Jack Misner",
   "bugs": {

@@ -15,6 +15,10 @@ jobs:
     uses: ./.github/workflows/format.yml
     secrets: inherit
 
+  package-check:
+    needs: format
+    uses: ./.github/workflows/package-check.yml
+
   test-node22:
     needs: format
     uses: ./.github/workflows/ci-node22.yml

@@ -44,6 +44,9 @@ jobs:
       - name: Build package
         run: npm run build
 
+      - name: Check package exports and declarations
+        run: npm run check:package
+
   publish:
     needs: ci
     runs-on: ubuntu-latest

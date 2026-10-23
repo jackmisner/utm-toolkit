@@ -18,7 +18,8 @@
  * and an unhandled promise rejection at module scope needs the event loop to turn
  * and so is not seen. The snapshot does not reach statics (`Object.assign = …`),
  * prototypes outside WATCHED_PROTOTYPES (`Map.prototype.x = …`), process state
- * beyond cwd and title, or symbol-keyed additions to globalThis.
+ * beyond cwd and title, symbol-keyed additions to globalThis, or an accessor
+ * whose setter alone is swapped.
  *
  * Usage: node scripts/assert-no-import-side-effects.js
  */
@@ -76,6 +77,20 @@ const LOADABLE = ['.js', '.cjs', '.mjs']
 const NOT_RUNTIME = /\.(d\.ts|d\.cts|d\.mts|map|json)$/
 const BUILTINS = new Set(builtinModules)
 const SPECIFIER = /(?:\bfrom|\brequire|\bimport)\s*\(?\s*['"]([^'"]+)['"]/g
+
+/**
+ * Node 20.0-20.17 and 22.0-22.9 read `window` while initialising the CJS module
+ * lexer, which the first ESM import of a CJS dependency triggers — reported as a
+ * side effect of the entry that triggered it. Refusing to run beats accusing the
+ * package of something Node did. Warming the lexer first does not help: it leaves
+ * a CloseReq handle that lands after the baseline instead.
+ */
+function nodeTooOldToProbe() {
+  const [major, minor] = process.versions.node.split('.').map(Number)
+  if (major === 20 && minor < 18) return '20.18.0'
+  if (major === 22 && minor < 10) return '22.10.0'
+  return null
+}
 
 function countByType(values) {
   const counts = {}
@@ -148,8 +163,8 @@ function snapshotEnvironment() {
 
   return {
     // String keys only: Node registers symbol-keyed internals on globalThis
-    // lazily (undici's dispatcher), so reading the descriptors here would itself
-    // look like a change on the next snapshot.
+    // lazily (undici's dispatcher, on Node 22+), so reading the descriptors here
+    // would itself look like a change on the next snapshot.
     globals: describeKeys(globalThis, Object.getOwnPropertyNames(globalThis)),
     prototypes,
     env: new Map(Object.entries(process.env)),
@@ -382,6 +397,14 @@ function selfTestFailure() {
 }
 
 function main() {
+  const needed = nodeTooOldToProbe()
+  if (needed) {
+    console.error(
+      `This check needs Node >= ${needed}; running ${process.versions.node}, which reads \`window\` while initialising the CJS module lexer.`,
+    )
+    process.exit(1)
+  }
+
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'))
   const { entries, unknown } = collectEntries(pkg.exports)
 

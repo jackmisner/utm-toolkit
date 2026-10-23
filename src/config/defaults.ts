@@ -67,7 +67,7 @@ export const DEFAULT_PII_PATTERNS: PiiPattern[] = [
 export const DEFAULT_PII_FILTER_CONFIG: PiiFilterConfig = {
   enabled: false,
   mode: 'reject',
-  patterns: [...DEFAULT_PII_PATTERNS],
+  patterns: /* @__PURE__ */ DEFAULT_PII_PATTERNS.slice(),
 }
 
 /**
@@ -106,7 +106,7 @@ export const DEFAULT_CONFIG: ResolvedUtmConfig = {
   appendToShares: true,
 
   /** Capture standard UTM parameters by default */
-  allowedParameters: [...STANDARD_UTM_PARAMETERS],
+  allowedParameters: /* @__PURE__ */ STANDARD_UTM_PARAMETERS.slice(),
 
   /** Values are not folded to lowercase by default */
   lowercaseValues: false,
@@ -121,13 +121,15 @@ export const DEFAULT_CONFIG: ResolvedUtmConfig = {
   excludeFromShares: [],
 
   /** Sanitization disabled by default */
-  sanitize: { ...DEFAULT_SANITIZE_CONFIG },
+  sanitize: /* @__PURE__ */ Object.assign({}, DEFAULT_SANITIZE_CONFIG),
 
   /** PII filtering disabled by default (deep copy to prevent shared references) */
-  piiFiltering: { ...DEFAULT_PII_FILTER_CONFIG, patterns: [...DEFAULT_PII_PATTERNS] },
+  piiFiltering: /* @__PURE__ */ Object.assign({}, DEFAULT_PII_FILTER_CONFIG, {
+    patterns: /* @__PURE__ */ DEFAULT_PII_PATTERNS.slice(),
+  }),
 
   /** Last-touch attribution by default */
-  attribution: { ...DEFAULT_ATTRIBUTION_CONFIG },
+  attribution: /* @__PURE__ */ Object.assign({}, DEFAULT_ATTRIBUTION_CONFIG),
 }
 
 /**

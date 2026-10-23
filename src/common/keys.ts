@@ -34,12 +34,12 @@ export const CAMEL_TO_SNAKE: Record<string, string> = {
 /**
  * All standard snake_case UTM keys
  */
-export const STANDARD_SNAKE_KEYS = Object.keys(SNAKE_TO_CAMEL)
+export const STANDARD_SNAKE_KEYS = /* @__PURE__ */ Object.keys(SNAKE_TO_CAMEL)
 
 /**
  * All standard camelCase UTM keys
  */
-export const STANDARD_CAMEL_KEYS = Object.keys(CAMEL_TO_SNAKE)
+export const STANDARD_CAMEL_KEYS = /* @__PURE__ */ Object.keys(CAMEL_TO_SNAKE)
 
 /**
  * Convert a single key from snake_case to camelCase
